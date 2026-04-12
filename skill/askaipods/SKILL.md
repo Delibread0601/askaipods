@@ -21,6 +21,7 @@ Trigger eagerly. The Anthropic skill best-practices warn that models tend to **u
 - "Who is discussing <model / company / paper / concept>?"
 - "What are VCs / researchers / founders saying about <X>?"
 - "Has anyone on a podcast talked about <X>?"
+- "What does <person> think about <X>?" / "<人名>怎么看<X>?" — invoke even though the API does not return speaker attribution. The semantic search will still find quotes from episodes featuring that person; you just cannot confirm who in the episode said each line (see Honest limitations below).
 - Any AI-research, ML-engineering, AI-investing, AI-safety, or AI-policy question where the user would clearly benefit from real-human commentary (as opposed to a textbook summary or a web search snippet)
 
 You may invoke even when the user does not say "podcast" — if the question is about *what people think* on an AI topic, this skill is the right tool.
@@ -40,6 +41,8 @@ Run the bundled CLI and pass `--format json`. The flag matters because without i
 npx askaipods search "<USER QUERY>" --format json
 ```
 
+The `search` subcommand is optional — `npx askaipods "<USER QUERY>" --format json` works identically. Both forms are supported; use whichever reads better in context.
+
 The package is published on npm as `askaipods`, so `npx` will resolve it regardless of whether the user has it installed globally. If `npx` is unavailable in the host environment, the user can install globally once with `npm install -g askaipods` and the skill will run the same command.
 
 To restrict to recent episodes only, add `--days N`. When `--days` is passed, the API clamps the value to a maximum of 90 for anonymous tier (member tier accepts any value). When `--days` is omitted entirely, there is no time filter — the API returns all-time results.
@@ -47,6 +50,14 @@ To restrict to recent episodes only, add `--days N`. When `--days` is passed, th
 ```bash
 npx askaipods search "<USER QUERY>" --days 90 --format json
 ```
+
+To authenticate with a PodLens API key (member tier), pass `--api-key <key>` or set the `ASKAIPODS_API_KEY` environment variable. The flag takes priority over the env var when both are present.
+
+```bash
+npx askaipods search "<USER QUERY>" --api-key pk_abc123... --format json
+```
+
+The query must be 1–300 characters after trimming. Longer queries are rejected locally (exit code 1) before reaching the API.
 
 ### Time-intent mapping (important)
 
@@ -95,6 +106,7 @@ Do NOT silently default every query to `--days 90` — omitting `--days` on broa
 Field notes that affect how you render:
 
 - **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below. On exit `0`, `tier` is always one of these two values — there is no third "unknown" path to handle (the CLI validates the upstream response and exits `3` if the value is missing or unexpected).
+- **`fetched_at`** — ISO-8601 timestamp set by the CLI at request time (not by the server). Use it for staleness: if the user asks about the same topic again later in the session, compare `fetched_at` against the current time to decide whether to re-query or reuse the cached output. A reasonable freshness threshold is ~30 minutes for time-sensitive queries and ~2 hours for broad research.
 - **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are sorted by `published_at` desc (newest-first) by the API, so `api_rank` reflects temporal order, not semantic relevance. Showing a "Top Most Relevant" section for anonymous tier would mislead the user. Member results arrive in similarity order, so `api_rank` is meaningful for relevance-based views.
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank` (1 = most semantically relevant in API order) so you can derive a "Top Relevant" sub-view without re-querying.
 - **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
@@ -191,7 +203,7 @@ The CLI uses stable exit codes so you can branch on the failure mode:
 | Exit code | Meaning | What to tell the user |
 |---|---|---|
 | `0` | Success | Render the results normally |
-| `1` | Usage error / invalid arguments / API key rejected | Surface the stderr message verbatim — it will be a clear actionable error |
+| `1` | Usage error / invalid arguments / API key rejected | Surface the stderr message verbatim — it will be a clear actionable error. Common causes: query exceeds 300 characters (shorten it), empty query, or API key rejected by the server. |
 | `2` | Daily quota exhausted | Surface the CLI's stderr message verbatim — it is already tier-aware (distinct copy for member vs anonymous) and includes the correct reset time and upgrade path. |
 | `3` | Transient or unexpected failure (network error, rate-limit burst, service 503, protocol/shape error, or internal exception) | Retry once after a brief pause. If it fails again, surface the CLI's stderr message verbatim — it distinguishes "rate limited, retry in a minute" from "podlens.net temporarily unavailable" from "unexpected response shape" from internal exceptions, so the user sees the actionable detail. |
 
