@@ -60,10 +60,12 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 | Runtime | Skill folder | Install guide |
 |---|---|---|
 | Claude Code | `~/.claude/skills/askaipods/` | [examples/claude-code-install.md](examples/claude-code-install.md) |
-| OpenAI Codex CLI | `~/.agents/skills/askaipods/` | [examples/codex-install.md](examples/codex-install.md) |
+| OpenAI Codex CLI | `~/.agents/skills/askaipods/` ✨ | [examples/codex-install.md](examples/codex-install.md) |
+| OpenClaw | `~/.agents/skills/askaipods/` ✨ or `~/.openclaw/skills/askaipods/` | [examples/openclaw-install.md](examples/openclaw-install.md) |
 | Hermes Agent | `~/.hermes/skills/askaipods/` | [examples/hermes-install.md](examples/hermes-install.md) |
-| OpenClaw | per OpenClaw docs | [examples/openclaw-install.md](examples/openclaw-install.md) |
 | Any other agentskills.io-compatible runtime | per runtime docs | follow the agentskills.io standard — copy `skill/askaipods/` into your agent's skills directory |
+
+✨ **Two-for-one tip**: Codex CLI and OpenClaw both read from `~/.agents/skills/`, so a single install at `~/.agents/skills/askaipods/` covers both runtimes simultaneously.
 
 The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with a **Latest** + **Top Relevant** + **Insights** structure.
 
