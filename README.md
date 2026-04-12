@@ -125,7 +125,7 @@ These are not bugs. The skill surfaces them honestly so neither you nor your age
 | `0` | Success |
 | `1` | Usage error / invalid arguments / API key rejected |
 | `2` | Daily quota exhausted |
-| `3` | Network error / podlens.net unavailable |
+| `3` | Transient failure — network error, rate-limit burst, service 503, or protocol/shape error. stderr has the actionable detail. |
 
 ## How the skill renders results
 

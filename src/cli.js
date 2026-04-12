@@ -37,8 +37,9 @@ ENVIRONMENT:
 EXIT CODES:
   0  success
   1  usage error / invalid arguments / API key rejected
-  2  daily quota exhausted
-  3  network error / podlens.net unavailable
+  2  daily quota exhausted (tier-aware message on stderr)
+  3  transient failure — network / rate-limit burst / 503 / protocol error
+     (stderr has the actionable detail)
 
 EXAMPLES:
   askaipods "what are people saying about test-time compute"

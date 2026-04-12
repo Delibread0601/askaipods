@@ -80,12 +80,17 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
     // Contract validation: reject any payload that doesn't match the
     // documented PodLens success envelope so a protocol break (upstream
     // proxy rewrite, schema drift, broken deployment) surfaces as a loud
-    // exit 3 instead of silently becoming an empty "anonymous tier"
-    // payload via format.js's defensive fallbacks. Required fields:
+    // exit 3 instead of silently becoming an empty or misclassified
+    // payload via format.js. Required fields:
     //   - data is a non-array object
     //   - data.results is an array (may be empty)
-    //   - data.meta is a non-array object with a non-empty string `tier`
-    //     and a non-array object `quota`
+    //   - data.meta is a non-array object
+    //   - data.meta.tier is exactly "anonymous" or "member" (closed enum
+    //     — any other value, including typos or casing mismatches, is a
+    //     contract violation because format.js's render_hint branch
+    //     treats anything != "member" as single_view, which would
+    //     silently misclassify a true member response as anonymous)
+    //   - data.meta.quota is a non-array object
     // `total`, `meta.query_hash`, `meta.restrictions`, `meta.cta` are
     // optional in the contract — do not require them.
     const m = data?.meta;
@@ -97,15 +102,14 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
       m &&
       typeof m === "object" &&
       !Array.isArray(m) &&
-      typeof m.tier === "string" &&
-      m.tier.length > 0 &&
+      (m.tier === "anonymous" || m.tier === "member") &&
       m.quota &&
       typeof m.quota === "object" &&
       !Array.isArray(m.quota);
     if (!valid) {
       throw exitErr(
         3,
-        "unexpected response shape from podlens.net (results, meta.tier, or meta.quota is missing or malformed). Retry in a moment.",
+        "unexpected response shape from podlens.net (results missing, meta.tier not in {anonymous, member}, or meta.quota malformed). Retry in a moment.",
       );
     }
     return data;
