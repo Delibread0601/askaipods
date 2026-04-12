@@ -70,7 +70,7 @@ export function toStructured(query, response) {
       api_rank: r.api_rank,
     })),
     meta: {
-      total_returned: typeof response.total === "number" ? response.total : apiResults.length,
+      total_returned: response.total,
       quota: response.meta.quota,
       restrictions: response.meta.restrictions ?? null,
       query_hash: response.meta.query_hash ?? null,

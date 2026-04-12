@@ -32,26 +32,39 @@ function isPlainObject(v) {
 
 // Validate the PodLens success envelope against the documented contract.
 // Any mismatch is treated as a protocol break and surfaces as exit 3 —
-// better a loud failure than silent garbage rows downstream in format.js.
+// better a loud AskaipodsError(exitCode=3) than a TypeError escaping as
+// exit 1 when format.js tries to operate on malformed fields.
 //
 // Required envelope:
-//   data                      : non-array object
-//   data.results              : array (may be empty)
-//   data.results[i]           : non-array object (no nulls, strings, arrays)
-//   data.meta                 : non-array object
-//   data.meta.tier            : closed enum {"anonymous","member"}
-//   data.meta.quota           : non-array object
-//   data.meta.quota.used      : finite number
-//   data.meta.quota.limit     : finite number
+//   data                       : non-array object
+//   data.total                 : finite number
+//   data.results               : array (may be empty)
+//   data.results[i]            : non-array object
+//   data.results[i].text       : string (required, never null)
+//   data.results[i].episode_title  : string or null/undefined
+//   data.results[i].podcast_name   : string or null/undefined
+//   data.results[i].published_at   : string or null/undefined
+//   data.meta                  : non-array object
+//   data.meta.tier             : closed enum {"anonymous","member"}
+//   data.meta.quota            : non-array object
+//   data.meta.quota.used       : finite number
+//   data.meta.quota.limit      : finite number
 //
 // Optional (kept loose on purpose):
-//   data.total, data.meta.quota.period, data.meta.quota.next_reset,
+//   data.meta.quota.period, data.meta.quota.next_reset,
 //   data.meta.query_hash, data.meta.restrictions, data.meta.cta
 function isValidSuccessEnvelope(data) {
   if (!isPlainObject(data)) return false;
+  if (typeof data.total !== "number" || !Number.isFinite(data.total)) return false;
   if (!Array.isArray(data.results)) return false;
   for (const item of data.results) {
     if (!isPlainObject(item)) return false;
+    if (typeof item.text !== "string") return false;
+    // `!= null` intentionally matches both null and undefined (contract
+    // allows either as "missing"), but rejects numbers, objects, arrays.
+    if (item.episode_title != null && typeof item.episode_title !== "string") return false;
+    if (item.podcast_name != null && typeof item.podcast_name !== "string") return false;
+    if (item.published_at != null && typeof item.published_at !== "string") return false;
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
