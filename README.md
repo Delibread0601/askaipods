@@ -7,7 +7,7 @@ $ askaipods "what are people saying about test-time compute"
 
 # askaipods · "what are people saying about test-time compute"
 
-*Tier: anonymous · Results: 20 · Quota: 1/5 daily*
+*Tier: anonymous · Results: 20 · Quota: 1/10 daily*
 
 ## Results — newest first
 
@@ -83,7 +83,7 @@ askaipods "Anthropic safety research" --format json
 # Restrict to recent episodes only (anonymous tier caps --days at 90; member tier accepts any value)
 askaipods "GPU shortage" --days 90
 
-# Use a member-tier API key for 50/day instead of 5/day
+# Use a member-tier API key for 50/day instead of 10/day
 ASKAIPODS_API_KEY=pk_xxx askaipods "your query"
 askaipods "your query" --api-key pk_xxx
 ```
@@ -100,7 +100,7 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 
 | | Anonymous (default) | Member |
 |---|---|---|
-| **Daily quota** | 5 searches per IP | 50 searches per user |
+| **Daily quota** | 10 searches per IP | 50 searches per user |
 | **Results returned** | 20 (deterministic top 20, sorted newest-first) | 20 (deterministic top 20, sorted by relevance) |
 | **Text length** | Full text | Full text |
 | **Date precision** | Month only (`2025-10`) | Full date (`2025-10-15`) |
@@ -108,7 +108,7 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | **Setup** | Nothing | `ASKAIPODS_API_KEY` env var |
 | **Sign up** | n/a | https://podlens.net |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. Sign up for member access only when you outgrow the 5/day quota or need full dates and unlimited lookback.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. Sign up for member access only when you outgrow the 10/day quota or need full dates and unlimited lookback.
 
 ## Honest limitations
 

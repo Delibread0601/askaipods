@@ -196,7 +196,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
     if (msg.includes("quota")) {
       const quotaMsg = apiKey
         ? "daily search quota exhausted (member tier: 50/day). Quota resets at 00:00 UTC."
-        : "daily search quota exhausted (anonymous tier: 5/day). Quota resets at 00:00 UTC. " +
+        : "daily search quota exhausted (anonymous tier: 10/day). Quota resets at 00:00 UTC. " +
           "For 50 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).";
       throw exitErr(2, quotaMsg);
     }

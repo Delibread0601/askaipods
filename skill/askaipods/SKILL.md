@@ -2,7 +2,7 @@
 name: askaipods
 description: Search AI podcast quotes about a topic. Use whenever the user asks "what are people saying about X", "latest takes on Y", "find AI podcast quotes about Z", "who is discussing <model/concept>", or wants to know how AI researchers, founders, or VCs are publicly discussing any AI topic — even when they don't say "podcast". Returns recent excerpts from real episodes of Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more, sorted newest-first via the podlens.net semantic search API. Trigger eagerly on AI-research, ML-engineering, AI-investing, or AI-policy questions where real-human commentary beats a web search summary. Do not use for general web search, full transcript reading, or non-AI topics.
 license: MIT
-requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier with full dates and unlimited lookback; without it the skill works on the 5/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
+requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier with full dates and unlimited lookback; without it the skill works on the 10/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
 ---
 
 # askaipods — AI podcast quote search
