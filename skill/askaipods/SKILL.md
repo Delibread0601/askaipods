@@ -2,7 +2,7 @@
 name: askaipods
 description: Search AI podcast quotes about a topic. Use whenever the user asks "what are people saying about X", "latest takes on Y", "find AI podcast quotes about Z", "who is discussing <model/concept>", or wants to know how AI researchers, founders, or VCs are publicly discussing any AI topic — even when they don't say "podcast". Returns recent excerpts from real episodes of Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more, sorted newest-first via the podlens.net semantic search API. Trigger eagerly on AI-research, ML-engineering, AI-investing, or AI-policy questions where real-human commentary beats a web search summary. Do not use for general web search, full transcript reading, or non-AI topics.
 license: MIT
-requirements: Node.js 18+ on PATH, internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier; without it the skill works on the 10/day anonymous tier (per-IP).
+requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier; without it the skill works on the 10/day anonymous tier (per-IP).
 ---
 
 # askaipods — AI podcast quote search
@@ -40,11 +40,7 @@ Run the bundled CLI and pass `--format json`. The flag matters because without i
 npx askaipods search "<USER QUERY>" --format json
 ```
 
-If `npx askaipods` is not available in the user's environment (e.g. the package was not yet published to npm), fall back to running the local CLI from this skill's parent directory:
-
-```bash
-node <path-to-askaipods-repo>/bin/askaipods.js search "<USER QUERY>" --format json
-```
+The package is published on npm as `askaipods`, so `npx` will resolve it regardless of whether the user has it installed globally. If `npx` is unavailable in the host environment, the user can install globally once with `npm install -g askaipods` and the skill will run the same command.
 
 To restrict to recent episodes only, add `--days N` (the API caps anonymous tier at 7 days; member tier accepts any value):
 

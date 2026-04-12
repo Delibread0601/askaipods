@@ -158,12 +158,12 @@ askaipods/
 ├── skill/askaipods/
 │   └── SKILL.md           ← agentskills.io standard skill file
 ├── examples/              ← per-runtime install guides
-├── package.json           ← zero dependencies (Node 18+ stdlib only)
+├── package.json           ← zero dependencies (Node 18.3.0+ stdlib only)
 ├── LICENSE                ← MIT
 └── README.md
 ```
 
-The CLI is intentionally zero-dependency (Node 18+ stdlib only) so `npx askaipods` cold-starts in under a second and the package install footprint is minimal.
+The CLI is intentionally zero-dependency (Node 18.3.0+ stdlib only — `node:util.parseArgs` requires 18.3.0) so `npx askaipods` cold-starts in under a second and the package install footprint is minimal.
 
 ## Contributing
 

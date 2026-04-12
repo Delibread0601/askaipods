@@ -26,6 +26,43 @@ function exitErr(code, message) {
   return new AskaipodsError(message, code);
 }
 
+function isPlainObject(v) {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
+// Validate the PodLens success envelope against the documented contract.
+// Any mismatch is treated as a protocol break and surfaces as exit 3 —
+// better a loud failure than silent garbage rows downstream in format.js.
+//
+// Required envelope:
+//   data                      : non-array object
+//   data.results              : array (may be empty)
+//   data.results[i]           : non-array object (no nulls, strings, arrays)
+//   data.meta                 : non-array object
+//   data.meta.tier            : closed enum {"anonymous","member"}
+//   data.meta.quota           : non-array object
+//   data.meta.quota.used      : finite number
+//   data.meta.quota.limit     : finite number
+//
+// Optional (kept loose on purpose):
+//   data.total, data.meta.quota.period, data.meta.quota.next_reset,
+//   data.meta.query_hash, data.meta.restrictions, data.meta.cta
+function isValidSuccessEnvelope(data) {
+  if (!isPlainObject(data)) return false;
+  if (!Array.isArray(data.results)) return false;
+  for (const item of data.results) {
+    if (!isPlainObject(item)) return false;
+  }
+  const m = data.meta;
+  if (!isPlainObject(m)) return false;
+  if (m.tier !== "anonymous" && m.tier !== "member") return false;
+  const q = m.quota;
+  if (!isPlainObject(q)) return false;
+  if (typeof q.used !== "number" || !Number.isFinite(q.used)) return false;
+  if (typeof q.limit !== "number" || !Number.isFinite(q.limit)) return false;
+  return true;
+}
+
 export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT }) {
   if (typeof query !== "string" || query.trim().length < MIN_QUERY_LEN) {
     throw exitErr(1, "query is required (1-300 characters)");
@@ -77,39 +114,10 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
   }
 
   if (response.ok) {
-    // Contract validation: reject any payload that doesn't match the
-    // documented PodLens success envelope so a protocol break (upstream
-    // proxy rewrite, schema drift, broken deployment) surfaces as a loud
-    // exit 3 instead of silently becoming an empty or misclassified
-    // payload via format.js. Required fields:
-    //   - data is a non-array object
-    //   - data.results is an array (may be empty)
-    //   - data.meta is a non-array object
-    //   - data.meta.tier is exactly "anonymous" or "member" (closed enum
-    //     — any other value, including typos or casing mismatches, is a
-    //     contract violation because format.js's render_hint branch
-    //     treats anything != "member" as single_view, which would
-    //     silently misclassify a true member response as anonymous)
-    //   - data.meta.quota is a non-array object
-    // `total`, `meta.query_hash`, `meta.restrictions`, `meta.cta` are
-    // optional in the contract — do not require them.
-    const m = data?.meta;
-    const valid =
-      data &&
-      typeof data === "object" &&
-      !Array.isArray(data) &&
-      Array.isArray(data.results) &&
-      m &&
-      typeof m === "object" &&
-      !Array.isArray(m) &&
-      (m.tier === "anonymous" || m.tier === "member") &&
-      m.quota &&
-      typeof m.quota === "object" &&
-      !Array.isArray(m.quota);
-    if (!valid) {
+    if (!isValidSuccessEnvelope(data)) {
       throw exitErr(
         3,
-        "unexpected response shape from podlens.net (results missing, meta.tier not in {anonymous, member}, or meta.quota malformed). Retry in a moment.",
+        "unexpected response shape from podlens.net (envelope, results entries, meta.tier, or meta.quota failed contract validation). Retry in a moment.",
       );
     }
     return data;
