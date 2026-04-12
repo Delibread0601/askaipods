@@ -24,7 +24,7 @@ USAGE:
 
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
-  --days <N>                 Only return results from the last N days (max 7 for anonymous tier)
+  --days <N>                 Only return results from the last N days (max 7 for anonymous tier; member tier accepts any value)
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
   -h, --help                 Show this message
   -v, --version              Show version

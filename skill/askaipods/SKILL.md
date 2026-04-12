@@ -58,7 +58,7 @@ npx askaipods search "<USER QUERY>" --days 30 --format json
 {
   "tier": "anonymous" | "member",
   "query": "the user's query string",
-  "fetched_at": "2026-04-12T08:30:00.000Z",
+  "fetched_at": "<ISO-8601 timestamp set by the CLI at request time>",
   "render_hint": "single_view" | "dual_view",
   "results": [
     {
@@ -71,7 +71,7 @@ npx askaipods search "<USER QUERY>" --days 30 --format json
   ],
   "meta": {
     "total_returned": 20,
-    "quota": { "used": 3, "limit": 50, "period": "daily", "next_reset": "2026-04-13T00:00:00Z" },
+    "quota": { "used": 3, "limit": 50, "period": "daily" },
     "restrictions": null,
     "query_hash": "..."
   }
@@ -80,15 +80,20 @@ npx askaipods search "<USER QUERY>" --days 30 --format json
 
 Field notes that affect how you render:
 
-- **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below.
+- **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below. The CLI defaults `tier` to `"anonymous"` if the upstream response somehow lacks the field, so you will always land on one of the two documented branches — never on a third "unknown" path.
 - **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are a randomized 10-of-20 subset, so `api_rank` only describes order *within that random subset*, not true semantic relevance against the corpus. Showing a "Top Most Relevant" section for anonymous tier would mislead the user.
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank` (1 = most semantically relevant in API order) so you can derive a "Top Relevant" sub-view without re-querying.
-- **`results[].date`** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API for query privacy). Display whatever you got — don't guess a day.
+- **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
+- **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API for query privacy). Display whatever you got — don't guess a day.
+- **`meta.quota`** — passed through from the podlens.net API. Sub-fields like `used`, `limit`, `period` are reliably present; other sub-fields (e.g., a reset timestamp) may or may not appear depending on the server version. Treat all sub-fields as optional and degrade gracefully.
+- **`meta.restrictions`** — `null` for member tier; for anonymous tier, an object describing the cap (e.g., `{ max_results: 10, text_truncated: true, results_randomized: true }`). If non-null, the closing anonymous-tier note (templated below) is the right way to surface it; do not parse the object field-by-field.
 - **No speaker name and no episode URL.** The corpus is indexed at the key-point level without per-speaker attribution (the upstream pipeline intentionally avoids attributing quotes to individuals because automatic speaker diarization is unreliable). Episode URLs are also not exposed by the public API. Render `Podcast — Episode` only; do not fabricate "Dario said" if the text doesn't already attribute itself.
 
 ## How to render the response
 
-Output exactly this structure. It is required for consistency across runtimes — users of this skill across Claude Code, Codex, Cursor, Hermes, OpenClaw, etc. should see the same shape regardless of which agent ran it.
+Output exactly this structure. It is required for consistency across runtimes — users of this skill across Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agentskills.io-compatible agent should see the same shape regardless of which agent ran it.
+
+(Note: the CLI's own `--format markdown` output uses a different layout — `### N. Podcast — Episode` headings — because that mode targets humans running `askaipods` directly in a terminal. As an agent you should always pass `--format json` and reformat the parsed payload yourself per the templates below; do not copy the CLI's markdown.)
 
 ### For `render_hint: "dual_view"` (member tier)
 

@@ -1,13 +1,13 @@
 # askaipods
 
-> Search AI podcast quotes about a topic — find what real guests on Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens of other AI podcasts are actually saying. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Cursor, OpenCode, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
+> Search AI podcast quotes about a topic — find what real guests on Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens of other AI podcasts are actually saying. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
 $ askaipods "what are people saying about test-time compute"
 
 # askaipods · "what are people saying about test-time compute"
 
-*Tier: anonymous · Results: 9 · Quota: 1/10 daily*
+*Tier: anonymous · Results: 10 · Quota: 1/10 daily*
 
 ## Results — newest first
 
@@ -23,14 +23,14 @@ $ askaipods "what are people saying about test-time compute"
 > Test-time compute as a paradigm pushes toward smaller base models because
 > the cost of solving a prob...
 
-(...7 more results, newest-first...)
+(...8 more results, newest-first...)
 ```
 
 ## Why this exists
 
 Web search is bad at "what is the AI community thinking about X right now". You get blog posts, Reddit threads, and outdated news articles. What you actually want is the *real conversation* — what researchers, founders, and investors are saying on AI podcasts, in their own words.
 
-`askaipods` is a thin CLI + agent skill that asks the [PodLens](https://podlens.net) semantic search API and returns the most relevant quote excerpts, sorted newest-first. The skill teaches your agent (Claude Code, Codex, Cursor, etc.) when to call the CLI, how to parse the output, and how to write a useful **Insights** section that summarizes the patterns across the returned quotes.
+`askaipods` is a thin CLI + agent skill that asks the [PodLens](https://podlens.net) semantic search API and returns the most relevant quote excerpts, sorted newest-first. The skill teaches your agent (Claude Code, OpenAI Codex, Hermes, OpenClaw, and any other [agentskills.io](https://agentskills.io)-compatible runtime) when to call the CLI, how to parse the output, and how to write a useful **Insights** section that summarizes the patterns across the returned quotes.
 
 ## Install
 
@@ -78,7 +78,7 @@ askaipods "what are VCs saying about reasoning models"
 # JSON output (for scripts and agents)
 askaipods "Anthropic safety research" --format json
 
-# Restrict to recent episodes only (max 7 days for anonymous tier)
+# Restrict to recent episodes only (max 7 days for anonymous tier; member tier accepts any value)
 askaipods "GPU shortage" --days 7
 
 # Use a member-tier API key for 50/day instead of 10/day

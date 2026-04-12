@@ -36,8 +36,15 @@ export function sortByDateDesc(items) {
 // member tier without re-querying. For anonymous tier api_rank reflects
 // only the relative order within a randomized subset, not the corpus
 // rank — `render_hint` flags that distinction.
+//
+// `tier` defaults to "anonymous" rather than "unknown" if the upstream
+// response is missing the field, so the SKILL.md tier branch (which
+// only documents `anonymous` and `member`) always lands on a documented
+// path. Anonymous is the safer default because it disables the
+// "Top Relevant" view — better to under-promise relevance ranking than
+// to render a misleading section based on randomized data.
 export function toStructured(query, response) {
-  const tier = response?.meta?.tier ?? "unknown";
+  const tier = response?.meta?.tier ?? "anonymous";
   const apiResults = Array.isArray(response?.results) ? response.results : [];
 
   const withRank = apiResults.map((r, idx) => ({ ...r, api_rank: idx + 1 }));

@@ -1,11 +1,6 @@
 # Install askaipods in OpenAI Codex CLI
 
-Codex CLI loads skills from `.agents/skills/` at four scopes (closest wins):
-
-1. `$CWD/.agents/skills/` (current directory)
-2. `$REPO_ROOT/.agents/skills/` (repository root)
-3. `$HOME/.agents/skills/` (user level)
-4. `/etc/codex/skills/` (system level)
+Codex CLI typically looks in `~/.agents/skills/` (user-level) and `.agents/skills/` (project / repo level). Project-scoped skills win over user-scoped when both exist with the same name. For the authoritative scope list and any system-level paths your installed version supports, consult the [official Codex skills documentation](https://developers.openai.com/codex/skills/).
 
 For most users, the **user-level** install is what you want — it makes `askaipods` available across every project.
 
