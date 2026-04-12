@@ -37,15 +37,22 @@ export function sortByDateDesc(items) {
 // only the relative order within a randomized subset, not the corpus
 // rank — `render_hint` flags that distinction.
 //
-// `tier` defaults to "anonymous" rather than "unknown" if the upstream
-// response is missing the field, so the SKILL.md tier branch (which
-// only documents `anonymous` and `member`) always lands on a documented
-// path. Anonymous is the safer default because it disables the
-// "Top Relevant" view — better to under-promise relevance ranking than
-// to render a misleading section based on randomized data.
+// Preconditions: `response` must be a validated success envelope from
+// `client.search()`. `client.js` validates `meta.tier` is a non-empty
+// string and `meta.quota` is an object before returning, so we read
+// those fields directly here without a fallback. A programmatic caller
+// that bypasses client.search() and hands toStructured a malformed
+// response will get a TypeError — that's louder than a silent fallback
+// and matches the "protocol break → exit 3" philosophy of client.js.
 export function toStructured(query, response) {
-  const tier = response?.meta?.tier ?? "anonymous";
-  const apiResults = Array.isArray(response?.results) ? response.results : [];
+  // These fields are guaranteed by client.js's success-envelope validator:
+  //   response.results (array), response.meta (object),
+  //   response.meta.tier (non-empty string), response.meta.quota (object).
+  // Read them directly. The remaining fields below (total,
+  // meta.query_hash, meta.restrictions) are optional per the server
+  // contract and keep their `?? null` / fallback defenses.
+  const tier = response.meta.tier;
+  const apiResults = response.results;
 
   const withRank = apiResults.map((r, idx) => ({ ...r, api_rank: idx + 1 }));
   const sorted = sortByDateDesc(withRank);
@@ -63,10 +70,10 @@ export function toStructured(query, response) {
       api_rank: r.api_rank,
     })),
     meta: {
-      total_returned: typeof response?.total === "number" ? response.total : apiResults.length,
-      quota: response?.meta?.quota ?? null,
-      restrictions: response?.meta?.restrictions ?? null,
-      query_hash: response?.meta?.query_hash ?? null,
+      total_returned: typeof response.total === "number" ? response.total : apiResults.length,
+      quota: response.meta.quota,
+      restrictions: response.meta.restrictions ?? null,
+      query_hash: response.meta.query_hash ?? null,
     },
   };
 }

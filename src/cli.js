@@ -99,17 +99,24 @@ export async function run(argv) {
 
   let days;
   if (values.days !== undefined) {
-    // Strict positive integer match. Two reasons for the shape:
+    // Strict positive integer match. Three reasons for the shape:
     //   (1) parseInt("7abc",10) silently returns 7 — reject any
     //       non-digit suffix / scientific notation / decimals / sign.
     //   (2) client.js only forwards `days` to the API when it's > 0,
     //       so "0" or "00" would silently drop the filter entirely
     //       instead of filtering to "0 days" as the user expected.
-    //       Reject at the CLI layer with a clear error.
+    //   (3) Number.parseInt("9".repeat(400), 10) returns Infinity, and
+    //       JSON.stringify({days: Infinity}) emits {"days":null}, which
+    //       would send a malformed body instead of the user's intent.
+    //       Reject inputs that don't survive round-trip as a safe int.
     if (!/^[1-9]\d*$/.test(values.days)) {
       throw usageError("--days must be a positive integer (1 or greater)");
     }
-    days = Number.parseInt(values.days, 10);
+    const n = Number.parseInt(values.days, 10);
+    if (!Number.isSafeInteger(n)) {
+      throw usageError("--days value is too large");
+    }
+    days = n;
   }
 
   const format = values.format ?? (process.stdout.isTTY ? "markdown" : "json");

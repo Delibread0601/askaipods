@@ -67,7 +67,7 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 
 ✨ **Two-for-one tip**: Codex CLI and OpenClaw both read from `~/.agents/skills/`, so a single install at `~/.agents/skills/askaipods/` covers both runtimes simultaneously.
 
-The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with a **Latest** + **Top Relevant** + **Insights** structure.
+The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout is tier-dependent — member tier renders **Latest 5** + **Top 5 Most Relevant** + **Insights**; anonymous tier renders **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for anonymous because results are a randomized subset and the rank is not a true semantic-relevance signal).
 
 ## Usage
 
