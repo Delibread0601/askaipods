@@ -25,7 +25,7 @@ const ANONYMOUS_NOTE =
 //
 // Anonymous tier dates are YYYY-MM (month only); Date.parse is
 // inconsistent across engines for that shape, so normalize to
-// YYYY-MM-01 first. Member tier member dates are always Date.parse-able
+// YYYY-MM-01 first. Member tier dates are always Date.parse-able
 // (either YYYY-MM-DD or a full ISO 8601 timestamp with offset).
 //
 // Nulls and any unparseable value sort to the end so absent-date

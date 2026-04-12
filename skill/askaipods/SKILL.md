@@ -76,7 +76,7 @@ npx askaipods search "<USER QUERY>" --days 30 --format json
 
 Field notes that affect how you render:
 
-- **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below. The CLI validates the upstream response and exits `3` (network / protocol error) if `meta.tier` is missing or not a string, so as the agent you will only ever see one of the two documented tier values on a successful CLI run — never a third "unknown" path.
+- **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below. On exit `0`, `tier` is always one of these two values — there is no third "unknown" path to handle (the CLI validates the upstream response and exits `3` if the value is missing or unexpected).
 - **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are a randomized 10-of-20 subset, so `api_rank` only describes order *within that random subset*, not true semantic relevance against the corpus. Showing a "Top Most Relevant" section for anonymous tier would mislead the user.
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank` (1 = most semantically relevant in API order) so you can derive a "Top Relevant" sub-view without re-querying.
 - **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
