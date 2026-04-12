@@ -38,8 +38,8 @@ EXIT CODES:
   0  success
   1  usage error / invalid arguments / API key rejected
   2  daily quota exhausted (tier-aware message on stderr)
-  3  transient failure — network / rate-limit burst / 503 / protocol error
-     (stderr has the actionable detail)
+  3  transient or unexpected failure — network / rate-limit burst / 503 /
+     protocol error / internal exception (stderr has the actionable detail)
 
 EXAMPLES:
   askaipods "what are people saying about test-time compute"
@@ -137,12 +137,15 @@ export async function run(argv) {
   //      unset/export mishaps and trailing-newline cases are common and
   //      unlikely to reflect user intent, so we silently coerce rather
   //      than erroring.
-  // Reject API keys containing C0 control characters (0x00-0x1F) or DEL
-  // (0x7F) — Node's Headers.append throws an "invalid header value"
-  // TypeError on these, which the fetch catch in client.js would then
-  // mislabel as a network error (exit 3) instead of a user input
-  // problem. Fail loud at the CLI boundary with exit 1.
-  const INVALID_KEY_CHARS = /[\u0000-\u001F\u007F]/;
+  // HTTP header values must be ByteStrings (each character ≤ 0xFF).
+  // Characters outside the printable ASCII + Latin-1 extended range
+  // cause Node's Headers constructor to throw a ByteString TypeError,
+  // which the fetch catch in client.js would mislabel as a network
+  // error (exit 3) instead of a user input problem. This allowlist
+  // rejects C0 controls (0x00-0x1F), DEL (0x7F), and any codepoint
+  // above 0xFF (LS, PS, ZWSP, emoji, etc.) at the CLI boundary with
+  // exit 1.
+  const INVALID_KEY_CHARS = /[^\x20-\x7E\x80-\xFF]/;
   let apiKey;
   if (values["api-key"] !== undefined) {
     const trimmed = values["api-key"].trim();
@@ -152,7 +155,7 @@ export async function run(argv) {
       );
     }
     if (INVALID_KEY_CHARS.test(trimmed)) {
-      throw usageError("--api-key value cannot contain control characters (tabs, newlines, CR, etc.)");
+      throw usageError("--api-key value contains invalid characters (control chars, non-Latin-1 Unicode, or emoji are not allowed in HTTP headers)");
     }
     apiKey = trimmed;
   } else {
@@ -161,7 +164,7 @@ export async function run(argv) {
       apiKey = undefined;
     } else if (INVALID_KEY_CHARS.test(envTrimmed)) {
       throw usageError(
-        "ASKAIPODS_API_KEY env var cannot contain control characters (tabs, newlines, CR, etc.)",
+        "ASKAIPODS_API_KEY env var contains invalid characters (control chars, non-Latin-1 Unicode, or emoji are not allowed in HTTP headers)",
       );
     } else {
       apiKey = envTrimmed;

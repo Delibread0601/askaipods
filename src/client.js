@@ -33,12 +33,14 @@ function isPlainObject(v) {
 // Strict calendar validation for published_at. Accepts only the three
 // documented shapes, validates all numeric components against calendar
 // and clock bounds, and round-trips via Date.UTC to catch impossible
-// day/month combinations (Feb 30 etc). Timezone offset is required to
-// be colonized (Z or ±HH:MM), hour bounded 0-14, minute bounded 0-59
-// — real-world offsets max at ±14:00, and uncolonized +1400 is not in
-// the contract even if some ISO variants accept it.
+// day/month combinations (Feb 30 etc). Timezone offset is required
+// whenever a time component is present — a timezone-less datetime like
+// "2025-10-15T12:00:00" would be ambiguous (Date.parse interprets it
+// in the system's local timezone, making sort order non-deterministic
+// across machines). Format: Z or ±HH:MM (colonized), hour bounded
+// 0-14, minute bounded 0-59.
 const PUBLISHED_AT_SHAPE =
-  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?)?)?$/;
+  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2}))?)?$/;
 function isValidPublishedAt(v) {
   if (v == null) return true;
   if (typeof v !== "string") return false;
@@ -63,7 +65,7 @@ function isValidPublishedAt(v) {
       const hh = Number(parts[4]);
       const mm = Number(parts[5]);
       const ss = Number(parts[6]);
-      if (hh > 23 || mm > 59 || ss > 60) return false; // 60 for leap seconds
+      if (hh > 23 || mm > 59 || ss > 59) return false;
       if (parts[7] !== undefined && parts[7] !== "Z") {
         // parts[7] is "±HH:MM" (enforced by regex). Check offset bounds.
         const offHh = Number(parts[7].slice(1, 3));
