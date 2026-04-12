@@ -52,7 +52,7 @@ OpenClaw should recognize the trigger phrase, shell out to `npx askaipods search
 ## Troubleshooting
 
 - **Skill not detected**: Run `openclaw skills update --all` to refresh, or restart the OpenClaw session. Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
-- **`npx askaipods` fails**: Make sure Node.js 18+ is on PATH: `node --version`.
+- **`npx askaipods` fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
 - **Conflicting copies across precedence levels**: Only the highest-precedence one wins. If you have askaipods in both `~/.agents/skills/` and `<workspace>/skills/`, the workspace one takes effect.
 
 ## Reference

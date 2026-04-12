@@ -39,7 +39,7 @@ Codex should detect the trigger, run `npx askaipods search "..." --format json`,
 
 - **Skill not detected**: Restart Codex (per the official docs, "If an update doesn't appear, restart Codex").
 - **Multiple skills with the same name across scopes**: Codex shows both in the selector — repository-scoped wins by default.
-- **`npx askaipods` fails**: Check Node.js 18+: `node --version`.
+- **`npx askaipods` fails**: Check Node.js 18.3.0+: `node --version`.
 
 ## Reference
 
