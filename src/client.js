@@ -30,6 +30,45 @@ function isPlainObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
+// Strict calendar validation for published_at. Accepts only the three
+// documented shapes, and only values that round-trip through Date.UTC
+// (rejects Feb 30, Apr 31, month 13, day 99, hour/min/sec out of range).
+// Without this, lex-comparison in sortByDateDesc would let impossible
+// dates like "2025-99-99" sort ahead of valid ones.
+const PUBLISHED_AT_SHAPE =
+  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?)?$/;
+function isValidPublishedAt(v) {
+  if (v == null) return true; // null/undefined allowed per contract
+  if (typeof v !== "string") return false;
+  const parts = v.match(PUBLISHED_AT_SHAPE);
+  if (!parts) return false;
+  const year = Number(parts[1]);
+  const month = Number(parts[2]);
+  if (year < 1970 || year > 9999) return false;
+  if (month < 1 || month > 12) return false;
+  if (parts[3] !== undefined) {
+    const day = Number(parts[3]);
+    if (day < 1 || day > 31) return false;
+    // Date.UTC silently wraps invalid day/month combos, so round-trip
+    // and verify the y/m/d match what we handed in.
+    const dt = new Date(Date.UTC(year, month - 1, day));
+    if (
+      dt.getUTCFullYear() !== year ||
+      dt.getUTCMonth() !== month - 1 ||
+      dt.getUTCDate() !== day
+    ) {
+      return false;
+    }
+    if (parts[4] !== undefined) {
+      const hh = Number(parts[4]);
+      const mm = Number(parts[5]);
+      const ss = Number(parts[6]);
+      if (hh > 23 || mm > 59 || ss > 60) return false; // 60 for leap seconds
+    }
+  }
+  return true;
+}
+
 // Validate the PodLens success envelope against the documented contract.
 // Any mismatch is treated as a protocol break and surfaces as exit 3 —
 // better a loud AskaipodsError(exitCode=3) than a TypeError escaping as
@@ -59,23 +98,15 @@ function isValidSuccessEnvelope(data) {
   if (!Array.isArray(data.results)) return false;
   for (const item of data.results) {
     if (!isPlainObject(item)) return false;
-    if (typeof item.text !== "string") return false;
+    // text must be a non-empty, non-whitespace-only string. An all-
+    // whitespace text would otherwise render as an empty blockquote
+    // row (`> ` with nothing after it) in --format markdown.
+    if (typeof item.text !== "string" || item.text.trim().length === 0) return false;
     // `!= null` intentionally matches both null and undefined (contract
     // allows either as "missing"), but rejects numbers, objects, arrays.
     if (item.episode_title != null && typeof item.episode_title !== "string") return false;
     if (item.podcast_name != null && typeof item.podcast_name !== "string") return false;
-    if (item.published_at != null) {
-      if (typeof item.published_at !== "string") return false;
-      // Require at least a YYYY-MM prefix. Without this, arbitrary
-      // strings like "" or "not a date" pass lex-compare in
-      // sortByDateDesc and corrupt the newest-first ordering — a
-      // "not a date" entry sorts ahead of "2026-04-30" because 'n'
-      // (0x6E) > '2' (0x32). Accept all three documented shapes:
-      //   YYYY-MM (anonymous tier)
-      //   YYYY-MM-DD (member tier short form)
-      //   YYYY-MM-DDTHH:MM:SSZ (member tier ISO timestamp)
-      if (!/^\d{4}-\d{2}(-\d{2}(T[\d:.+\-Zz]*)?)?$/.test(item.published_at)) return false;
-    }
+    if (!isValidPublishedAt(item.published_at)) return false;
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;

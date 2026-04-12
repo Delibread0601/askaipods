@@ -126,25 +126,29 @@ export async function run(argv) {
   }
 
   // Source of truth for the API key:
-  //   1. --api-key flag if provided AND non-empty (empty `--api-key=`
-  //      is rejected as usage error — the `??` fallback chain would
-  //      otherwise let "" silently win over a set env var, sending no
-  //      X-PodLens-API-Key header and downgrading a member request to
-  //      anonymous tier without the user knowing).
-  //   2. ASKAIPODS_API_KEY env var if --api-key is unset. An empty env
-  //      var is tolerated (treated as unset) because shell unset/export
-  //      mishaps are common and unlikely to reflect user intent.
+  //   1. --api-key flag if provided AND non-empty after trim. An empty
+  //      or whitespace-only flag is rejected as a usage error — Node's
+  //      Headers constructor normalizes a whitespace-only header value
+  //      to empty, so without this trim the user would silently get no
+  //      X-PodLens-API-Key header and a silent tier downgrade from
+  //      member to anonymous.
+  //   2. ASKAIPODS_API_KEY env var if --api-key is unset. The env var
+  //      is trimmed and treated as unset when empty/whitespace — shell
+  //      unset/export mishaps and trailing-newline cases are common and
+  //      unlikely to reflect user intent, so we silently coerce rather
+  //      than erroring.
   let apiKey;
   if (values["api-key"] !== undefined) {
-    if (values["api-key"] === "") {
+    const trimmed = values["api-key"].trim();
+    if (trimmed.length === 0) {
       throw usageError(
-        "--api-key value cannot be empty; omit the flag to use the anonymous tier or the ASKAIPODS_API_KEY env var",
+        "--api-key value cannot be empty or whitespace-only; omit the flag to use the anonymous tier or the ASKAIPODS_API_KEY env var",
       );
     }
-    apiKey = values["api-key"];
+    apiKey = trimmed;
   } else {
-    const envKey = process.env.ASKAIPODS_API_KEY;
-    apiKey = envKey && envKey.length > 0 ? envKey : undefined;
+    const envTrimmed = (process.env.ASKAIPODS_API_KEY ?? "").trim();
+    apiKey = envTrimmed.length > 0 ? envTrimmed : undefined;
   }
 
   const response = await search({ query, days, apiKey });
