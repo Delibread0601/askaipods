@@ -125,7 +125,27 @@ export async function run(argv) {
     throw usageError(`--format must be 'json' or 'markdown', got '${format}'`);
   }
 
-  const apiKey = values["api-key"] ?? process.env.ASKAIPODS_API_KEY;
+  // Source of truth for the API key:
+  //   1. --api-key flag if provided AND non-empty (empty `--api-key=`
+  //      is rejected as usage error — the `??` fallback chain would
+  //      otherwise let "" silently win over a set env var, sending no
+  //      X-PodLens-API-Key header and downgrading a member request to
+  //      anonymous tier without the user knowing).
+  //   2. ASKAIPODS_API_KEY env var if --api-key is unset. An empty env
+  //      var is tolerated (treated as unset) because shell unset/export
+  //      mishaps are common and unlikely to reflect user intent.
+  let apiKey;
+  if (values["api-key"] !== undefined) {
+    if (values["api-key"] === "") {
+      throw usageError(
+        "--api-key value cannot be empty; omit the flag to use the anonymous tier or the ASKAIPODS_API_KEY env var",
+      );
+    }
+    apiKey = values["api-key"];
+  } else {
+    const envKey = process.env.ASKAIPODS_API_KEY;
+    apiKey = envKey && envKey.length > 0 ? envKey : undefined;
+  }
 
   const response = await search({ query, days, apiKey });
 

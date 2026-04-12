@@ -64,7 +64,18 @@ function isValidSuccessEnvelope(data) {
     // allows either as "missing"), but rejects numbers, objects, arrays.
     if (item.episode_title != null && typeof item.episode_title !== "string") return false;
     if (item.podcast_name != null && typeof item.podcast_name !== "string") return false;
-    if (item.published_at != null && typeof item.published_at !== "string") return false;
+    if (item.published_at != null) {
+      if (typeof item.published_at !== "string") return false;
+      // Require at least a YYYY-MM prefix. Without this, arbitrary
+      // strings like "" or "not a date" pass lex-compare in
+      // sortByDateDesc and corrupt the newest-first ordering — a
+      // "not a date" entry sorts ahead of "2026-04-30" because 'n'
+      // (0x6E) > '2' (0x32). Accept all three documented shapes:
+      //   YYYY-MM (anonymous tier)
+      //   YYYY-MM-DD (member tier short form)
+      //   YYYY-MM-DDTHH:MM:SSZ (member tier ISO timestamp)
+      if (!/^\d{4}-\d{2}(-\d{2}(T[\d:.+\-Zz]*)?)?$/.test(item.published_at)) return false;
+    }
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
