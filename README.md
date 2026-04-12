@@ -142,7 +142,7 @@ For member tier (`render_hint: dual_view`), the host agent renders two sections 
 (3-5 bullets synthesizing patterns across the quotes)
 ```
 
-For anonymous tier (`render_hint: single_view`), only Latest and Insights — the Top Relevant section is intentionally suppressed because anonymous results are randomized within the top 20, so api_rank does not represent true semantic relevance.
+For anonymous tier (`render_hint: single_view`), only Recent Quotes and Insights — the Top Relevant section is intentionally suppressed because anonymous results are randomized within the top 20, so api_rank does not represent true semantic relevance.
 
 See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill specification.
 
