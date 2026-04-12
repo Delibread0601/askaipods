@@ -137,6 +137,12 @@ export async function run(argv) {
   //      unset/export mishaps and trailing-newline cases are common and
   //      unlikely to reflect user intent, so we silently coerce rather
   //      than erroring.
+  // Reject API keys containing C0 control characters (0x00-0x1F) or DEL
+  // (0x7F) — Node's Headers.append throws an "invalid header value"
+  // TypeError on these, which the fetch catch in client.js would then
+  // mislabel as a network error (exit 3) instead of a user input
+  // problem. Fail loud at the CLI boundary with exit 1.
+  const INVALID_KEY_CHARS = /[\u0000-\u001F\u007F]/;
   let apiKey;
   if (values["api-key"] !== undefined) {
     const trimmed = values["api-key"].trim();
@@ -145,10 +151,21 @@ export async function run(argv) {
         "--api-key value cannot be empty or whitespace-only; omit the flag to use the anonymous tier or the ASKAIPODS_API_KEY env var",
       );
     }
+    if (INVALID_KEY_CHARS.test(trimmed)) {
+      throw usageError("--api-key value cannot contain control characters (tabs, newlines, CR, etc.)");
+    }
     apiKey = trimmed;
   } else {
     const envTrimmed = (process.env.ASKAIPODS_API_KEY ?? "").trim();
-    apiKey = envTrimmed.length > 0 ? envTrimmed : undefined;
+    if (envTrimmed.length === 0) {
+      apiKey = undefined;
+    } else if (INVALID_KEY_CHARS.test(envTrimmed)) {
+      throw usageError(
+        "ASKAIPODS_API_KEY env var cannot contain control characters (tabs, newlines, CR, etc.)",
+      );
+    } else {
+      apiKey = envTrimmed;
+    }
   }
 
   const response = await search({ query, days, apiKey });

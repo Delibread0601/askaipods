@@ -31,14 +31,16 @@ function isPlainObject(v) {
 }
 
 // Strict calendar validation for published_at. Accepts only the three
-// documented shapes, and only values that round-trip through Date.UTC
-// (rejects Feb 30, Apr 31, month 13, day 99, hour/min/sec out of range).
-// Without this, lex-comparison in sortByDateDesc would let impossible
-// dates like "2025-99-99" sort ahead of valid ones.
+// documented shapes, validates all numeric components against calendar
+// and clock bounds, and round-trips via Date.UTC to catch impossible
+// day/month combinations (Feb 30 etc). Timezone offset is required to
+// be colonized (Z or ±HH:MM), hour bounded 0-14, minute bounded 0-59
+// — real-world offsets max at ±14:00, and uncolonized +1400 is not in
+// the contract even if some ISO variants accept it.
 const PUBLISHED_AT_SHAPE =
-  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?)?)?$/;
+  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?)?)?$/;
 function isValidPublishedAt(v) {
-  if (v == null) return true; // null/undefined allowed per contract
+  if (v == null) return true;
   if (typeof v !== "string") return false;
   const parts = v.match(PUBLISHED_AT_SHAPE);
   if (!parts) return false;
@@ -49,8 +51,6 @@ function isValidPublishedAt(v) {
   if (parts[3] !== undefined) {
     const day = Number(parts[3]);
     if (day < 1 || day > 31) return false;
-    // Date.UTC silently wraps invalid day/month combos, so round-trip
-    // and verify the y/m/d match what we handed in.
     const dt = new Date(Date.UTC(year, month - 1, day));
     if (
       dt.getUTCFullYear() !== year ||
@@ -64,6 +64,12 @@ function isValidPublishedAt(v) {
       const mm = Number(parts[5]);
       const ss = Number(parts[6]);
       if (hh > 23 || mm > 59 || ss > 60) return false; // 60 for leap seconds
+      if (parts[7] !== undefined && parts[7] !== "Z") {
+        // parts[7] is "±HH:MM" (enforced by regex). Check offset bounds.
+        const offHh = Number(parts[7].slice(1, 3));
+        const offMm = Number(parts[7].slice(4, 6));
+        if (offHh > 14 || offMm > 59) return false;
+      }
     }
   }
   return true;

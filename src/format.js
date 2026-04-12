@@ -15,18 +15,35 @@ const ANONYMOUS_NOTE =
   "Anonymous tier: 10 randomized results from top 20, text truncated by rank, " +
   "dates fuzzed to month. Set ASKAIPODS_API_KEY for 50 searches/day with full text and dates.";
 
-// Lexical compare on YYYY-MM[-DD][THH:MM:SSZ] descending puts newest
-// first regardless of whether the date is a full ISO timestamp (member
-// tier) or a YYYY-MM month-prefix (anonymous tier). Nulls sort to the
-// end so absent-date results don't crowd out the dated ones.
+// Sort results newest-first by parsing each `published_at` to a UTC
+// millisecond timestamp and comparing numerically. Pure lexical compare
+// is broken for ISO timestamps with timezone offsets:
+// "2025-01-01T00:30:00+14:00" (UTC 2024-12-31T10:30Z) lex-sorts ahead
+// of "2024-12-31T23:30:00-12:00" (UTC 2025-01-01T11:30Z), reversing the
+// newest-first contract for any member-tier response that carries
+// offset timestamps. Numeric UTC compare fixes that.
+//
+// Anonymous tier dates are YYYY-MM (month only); Date.parse is
+// inconsistent across engines for that shape, so normalize to
+// YYYY-MM-01 first. Member tier member dates are always Date.parse-able
+// (either YYYY-MM-DD or a full ISO 8601 timestamp with offset).
+//
+// Nulls and any unparseable value sort to the end so absent-date
+// results don't crowd out the dated ones.
+function toUtcMs(dateStr) {
+  if (!dateStr) return null;
+  const normalized = /^\d{4}-\d{2}$/.test(dateStr) ? `${dateStr}-01` : dateStr;
+  const ms = Date.parse(normalized);
+  return Number.isNaN(ms) ? null : ms;
+}
 export function sortByDateDesc(items) {
   return [...items].sort((a, b) => {
-    const ad = a?.published_at ?? "";
-    const bd = b?.published_at ?? "";
-    if (ad === bd) return 0;
-    if (!ad) return 1;
-    if (!bd) return -1;
-    return bd < ad ? -1 : 1;
+    const am = toUtcMs(a?.published_at);
+    const bm = toUtcMs(b?.published_at);
+    if (am === bm) return 0;
+    if (am === null) return 1;
+    if (bm === null) return -1;
+    return bm - am;
   });
 }
 
