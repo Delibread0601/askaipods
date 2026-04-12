@@ -9,7 +9,7 @@ requirements: Node.js 18+ on PATH, internet access to podlens.net. Optional ASKA
 
 This skill turns "what is the AI community saying about X" into a list of real quote excerpts pulled from recent episodes of top AI podcasts. The corpus is semantically indexed (embedding-based search), so phrasings like "test-time compute", "inference-time scaling", and "thinking longer" all return overlapping results — the user does not need to guess the exact words a guest used.
 
-The data source is the public PodLens search API at `podlens.net`. The skill never hits that API directly from your model context — it shells out to a small bundled CLI (`askaipods`) that handles HTTP, retries, error mapping, and result sorting. Your job is to invoke the CLI, parse its JSON, and present the results in the format below.
+The data source is the public PodLens search API at `podlens.net`. The skill never hits that API directly from your model context — it shells out to a small bundled CLI (`askaipods`) that handles HTTP, error mapping, and result sorting. Your job is to invoke the CLI, parse its JSON, and present the results in the format below.
 
 ## When to invoke
 
@@ -114,7 +114,7 @@ Output exactly this structure. It is required for consistency across runtimes �
 
 2. ...
 
-(these 5 are the results with `api_rank` 1 through 5, regardless of date — pull them from the same `results` array by filtering on `api_rank`)
+(these 5 are the results with `api_rank` 1 through 5, regardless of date — pull them from the `results` array by filtering on `api_rank`, **then sort ascending by `api_rank`** so rank 1 appears first. The `results` array is sorted newest-first, so a naive filter would leave these in date order instead of rank order.)
 
 ## 💡 Insights
 
@@ -178,7 +178,7 @@ The CLI uses stable exit codes so you can branch on the failure mode:
 |---|---|---|
 | `0` | Success | Render the results normally |
 | `1` | Usage error / invalid arguments / API key rejected | Surface the stderr message verbatim — it will be a clear actionable error |
-| `2` | Daily quota exhausted | "Daily search quota reached. Anonymous tier resets at 00:00 UTC; for 50 searches/day, set `ASKAIPODS_API_KEY` (sign up at https://podlens.net)." |
+| `2` | Daily quota exhausted | Surface the CLI's stderr message verbatim — it is already tier-aware (distinct copy for member vs anonymous) and includes the correct reset time and upgrade path. |
 | `3` | Network error / podlens.net unavailable | Retry once after a brief pause; if it fails again, tell the user "PodLens search is temporarily unavailable. Try again in a few minutes." |
 
 If the `results` array is empty (zero matches above the similarity threshold), say so explicitly: "No quotes found for that topic. The corpus is AI-focused — for non-AI topics, try a web search instead. For AI topics, try rephrasing or broadening the query." Do not invent quotes to fill the gap.

@@ -99,11 +99,13 @@ export async function run(argv) {
 
   let days;
   if (values.days !== undefined) {
-    const n = Number.parseInt(values.days, 10);
-    if (!Number.isFinite(n) || n < 0) {
+    // Strict integer match: parseInt("7abc",10) silently returns 7, which
+    // would send a different days filter than the user typed. Reject any
+    // non-digit suffix / scientific notation / decimals up front.
+    if (!/^\d+$/.test(values.days)) {
       throw usageError("--days must be a non-negative integer");
     }
-    days = n;
+    days = Number.parseInt(values.days, 10);
   }
 
   const format = values.format ?? (process.stdout.isTTY ? "markdown" : "json");

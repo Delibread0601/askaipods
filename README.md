@@ -1,6 +1,6 @@
 # askaipods
 
-> Search AI podcast quotes about a topic — find what real guests on Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens of other AI podcasts are actually saying. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
+> Search AI podcast quotes about a topic — recent episode excerpts from Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens of other AI podcasts, surfaced as short indexed quotes (no per-speaker attribution). A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
 $ askaipods "what are people saying about test-time compute"

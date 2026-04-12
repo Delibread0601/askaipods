@@ -1,7 +1,7 @@
 {
   "name": "askaipods",
   "version": "0.1.0",
-  "description": "Search AI podcast quotes by topic — find what Lex Fridman, Dwarkesh Patel, No Priors, and Latent Space guests are actually saying. Universal agentskills.io skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by podlens.net.",
+  "description": "Search AI podcast quotes by topic — recent episode excerpts from Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more. Universal agentskills.io skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by podlens.net.",
   "type": "module",
   "bin": {
     "askaipods": "./bin/askaipods.js"

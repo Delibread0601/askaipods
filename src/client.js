@@ -77,20 +77,38 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
   }
 
   if (response.ok) {
+    // Minimal contract validation so a protocol break (e.g., upstream
+    // proxy rewriting the body, or a future server-side schema change)
+    // surfaces as a loud exit 3 instead of silently becoming an empty
+    // "anonymous tier" payload via format.js's defensive fallbacks.
+    if (
+      !data ||
+      typeof data !== "object" ||
+      !Array.isArray(data.results) ||
+      typeof data.meta !== "object" ||
+      data.meta === null
+    ) {
+      throw exitErr(
+        3,
+        "unexpected response shape from podlens.net (missing results array or meta object). Retry in a moment.",
+      );
+    }
     return data;
   }
 
   // Distinguish 429 cases by inspecting the message: the server uses
   // distinct strings for "burst limit hit" vs "daily quota exhausted",
-  // and only the latter warrants telling the user about API keys.
+  // and only the latter warrants the "daily quota" exit code. The
+  // quota message is tier-aware: a member hitting the 50/day cap must
+  // not be told to "set ASKAIPODS_API_KEY" — they already have one.
   if (response.status === 429) {
     const msg = String(data?.error ?? "").toLowerCase();
     if (msg.includes("quota")) {
-      throw exitErr(
-        2,
-        "daily search quota exhausted. Anonymous tier resets at 00:00 UTC. " +
-          "For 50 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).",
-      );
+      const quotaMsg = apiKey
+        ? "daily search quota exhausted (member tier: 50/day). Quota resets at 00:00 UTC."
+        : "daily search quota exhausted (anonymous tier: 10/day). Quota resets at 00:00 UTC. " +
+          "For 50 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).";
+      throw exitErr(2, quotaMsg);
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");
   }
