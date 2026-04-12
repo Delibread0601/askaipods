@@ -94,7 +94,7 @@ Once the skill is installed in your agent's skills directory, simply ask:
 
 > What are people saying about test-time compute on AI podcasts?
 
-Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with a Latest section, a Top Relevant section, and an AI-generated Insights summary. No CLI knowledge required from the user.
+Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout is tier-dependent: **member tier** renders dual sections (Latest 5 + Top 5 Most Relevant + Insights); **anonymous tier** renders a single section (Recent Quotes + Insights), because anonymous results are a randomized subset of the top 20 and showing a "Top Relevant" view would be misleading. No CLI knowledge required from the user either way.
 
 ## Tier comparison
 

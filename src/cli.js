@@ -99,11 +99,15 @@ export async function run(argv) {
 
   let days;
   if (values.days !== undefined) {
-    // Strict integer match: parseInt("7abc",10) silently returns 7, which
-    // would send a different days filter than the user typed. Reject any
-    // non-digit suffix / scientific notation / decimals up front.
-    if (!/^\d+$/.test(values.days)) {
-      throw usageError("--days must be a non-negative integer");
+    // Strict positive integer match. Two reasons for the shape:
+    //   (1) parseInt("7abc",10) silently returns 7 — reject any
+    //       non-digit suffix / scientific notation / decimals / sign.
+    //   (2) client.js only forwards `days` to the API when it's > 0,
+    //       so "0" or "00" would silently drop the filter entirely
+    //       instead of filtering to "0 days" as the user expected.
+    //       Reject at the CLI layer with a clear error.
+    if (!/^[1-9]\d*$/.test(values.days)) {
+      throw usageError("--days must be a positive integer (1 or greater)");
     }
     days = Number.parseInt(values.days, 10);
   }
