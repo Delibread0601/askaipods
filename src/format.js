@@ -12,8 +12,8 @@
 // Relevant" sub-views — see SKILL.md.
 
 const ANONYMOUS_NOTE =
-  "Anonymous tier: 10 randomized results from top 20, text truncated by rank, " +
-  "dates fuzzed to month. Set ASKAIPODS_API_KEY for 50 searches/day with full text and dates.";
+  "Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, " +
+  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 50 searches/day with full dates and unlimited lookback.";
 
 // Sort results newest-first by parsing each `published_at` to a UTC
 // millisecond timestamp and comparing numerically. Pure lexical compare
@@ -51,8 +51,8 @@ export function sortByDateDesc(items) {
 // its `api_rank` (1 = most semantically relevant in API order) so the
 // SKILL.md can tell the agent to derive a "Top Relevant" sub-view for
 // member tier without re-querying. For anonymous tier api_rank reflects
-// only the relative order within a randomized subset, not the corpus
-// rank — `render_hint` flags that distinction.
+// temporal order (newest-first from the API), not semantic relevance —
+// `render_hint` flags that distinction.
 //
 // Preconditions: `response` must be a validated success envelope from
 // `client.search()`. `client.js` validates `meta.tier` is a non-empty

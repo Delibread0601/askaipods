@@ -7,7 +7,7 @@ $ askaipods "what are people saying about test-time compute"
 
 # askaipods · "what are people saying about test-time compute"
 
-*Tier: anonymous · Results: 10 · Quota: 1/10 daily*
+*Tier: anonymous · Results: 20 · Quota: 1/5 daily*
 
 ## Results — newest first
 
@@ -23,7 +23,7 @@ $ askaipods "what are people saying about test-time compute"
 > Test-time compute as a paradigm pushes toward smaller base models because
 > the cost of solving a prob...
 
-(...8 more results, newest-first...)
+(...18 more results, newest-first...)
 ```
 
 ## Why this exists
@@ -67,7 +67,7 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 
 ✨ **Two-for-one tip**: Codex CLI and OpenClaw both read from `~/.agents/skills/`, so a single install at `~/.agents/skills/askaipods/` covers both runtimes simultaneously.
 
-The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout is tier-dependent — member tier renders **Latest 5** + **Top 5 Most Relevant** + **Insights**; anonymous tier renders **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for anonymous because results are a randomized subset and the rank is not a true semantic-relevance signal).
+The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout is tier-dependent — member tier renders **Latest 5** + **Top 5 Most Relevant** + **Insights**; anonymous tier renders **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for anonymous because the API returns results sorted by date, not by semantic relevance).
 
 ## Usage
 
@@ -80,10 +80,10 @@ askaipods "what are VCs saying about reasoning models"
 # JSON output (for scripts and agents)
 askaipods "Anthropic safety research" --format json
 
-# Restrict to recent episodes only (max 7 days for anonymous tier; member tier accepts any value)
-askaipods "GPU shortage" --days 7
+# Restrict to recent episodes only (anonymous tier caps --days at 90; member tier accepts any value)
+askaipods "GPU shortage" --days 90
 
-# Use a member-tier API key for 50/day instead of 10/day
+# Use a member-tier API key for 50/day instead of 5/day
 ASKAIPODS_API_KEY=pk_xxx askaipods "your query"
 askaipods "your query" --api-key pk_xxx
 ```
@@ -94,27 +94,28 @@ Once the skill is installed in your agent's skills directory, simply ask:
 
 > What are people saying about test-time compute on AI podcasts?
 
-Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout is tier-dependent: **member tier** renders dual sections (Latest 5 + Top 5 Most Relevant + Insights); **anonymous tier** renders a single section (Recent Quotes + Insights), because anonymous results are a randomized subset of the top 20 and showing a "Top Relevant" view would be misleading. No CLI knowledge required from the user either way.
+Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout is tier-dependent: **member tier** renders dual sections (Latest 5 + Top 5 Most Relevant + Insights); **anonymous tier** renders a single section (Recent Quotes + Insights), because anonymous results are sorted by date (not semantic relevance) and showing a "Top Relevant" view would be misleading. No CLI knowledge required from the user either way.
 
 ## Tier comparison
 
 | | Anonymous (default) | Member |
 |---|---|---|
-| **Daily quota** | 10 searches per IP | 50 searches per user |
-| **Results returned** | 10 (randomized from top 20) | 20 (fixed top 20) |
-| **Text length** | Truncated by rank (150/100/60 chars) | Full text |
+| **Daily quota** | 5 searches per IP | 50 searches per user |
+| **Results returned** | 20 (deterministic top 20, sorted newest-first) | 20 (deterministic top 20, sorted by relevance) |
+| **Text length** | Full text | Full text |
 | **Date precision** | Month only (`2025-10`) | Full date (`2025-10-15`) |
+| **`--days` cap (when specified)** | 90 days | Unlimited |
 | **Setup** | Nothing | `ASKAIPODS_API_KEY` env var |
 | **Sign up** | n/a | https://podlens.net |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. Sign up for member access only when you outgrow the 10/day quota or need full text and exact dates.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. Sign up for member access only when you outgrow the 5/day quota or need full dates and unlimited lookback.
 
 ## Honest limitations
 
 - **No speaker attribution.** The corpus indexes quotes at the episode level but does not attempt to identify *which guest* said each quote. The upstream pipeline avoids speaker labeling because automatic diarization is unreliable, and a wrong attribution is worse than no attribution.
 - **No episode URLs.** The public API does not expose direct podcast or episode links. You will need to search the podcast and episode title in your podcast app of choice.
 - **AI-focused corpus.** Coverage is dense for AI research, ML engineering, AI investing, and AI policy. Off-topic queries return sparse, noisy results.
-- **Short quote excerpts.** Each result is typically 1-3 sentences (anonymous tier truncates further). For long-form context, listen to the episode.
+- **Short quote excerpts.** Each result is typically 1-3 sentences. For long-form context, listen to the episode.
 
 These are not bugs. The skill surfaces them honestly so neither you nor your agent fabricate things the API does not provide.
 
@@ -142,7 +143,7 @@ For member tier (`render_hint: dual_view`), the host agent renders two sections 
 (3-5 bullets synthesizing patterns across the quotes)
 ```
 
-For anonymous tier (`render_hint: single_view`), only Recent Quotes and Insights — the Top Relevant section is intentionally suppressed because anonymous results are randomized within the top 20, so api_rank does not represent true semantic relevance.
+For anonymous tier (`render_hint: single_view`), only Recent Quotes and Insights — the Top Relevant section is intentionally suppressed because anonymous results are sorted by date (newest-first), so api_rank reflects temporal order, not semantic relevance.
 
 See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill specification.
 

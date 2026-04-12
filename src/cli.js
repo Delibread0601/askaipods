@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.1.1";
+const VERSION = "0.2.0";
 
 const HELP_TEXT = `askaipods ${VERSION} — search AI podcast quotes by topic
 
@@ -24,13 +24,13 @@ USAGE:
 
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
-  --days <N>                 Only return results from the last N days (max 7 for anonymous tier; member tier accepts any value)
+  --days <N>                 Only return results from the last N days (anonymous tier caps at 90; member tier accepts any value)
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
   -h, --help                 Show this message
   -v, --version              Show version
 
 ENVIRONMENT:
-  ASKAIPODS_API_KEY          PodLens API key. Without it: 10 searches/day per IP (anonymous).
+  ASKAIPODS_API_KEY          PodLens API key. Without it: 5 searches/day per IP (anonymous).
                              With it: 50 searches/day per user (member).
                              Sign up at https://podlens.net to get one.
 

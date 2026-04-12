@@ -2,7 +2,7 @@
 name: askaipods
 description: Search AI podcast quotes about a topic. Use whenever the user asks "what are people saying about X", "latest takes on Y", "find AI podcast quotes about Z", "who is discussing <model/concept>", or wants to know how AI researchers, founders, or VCs are publicly discussing any AI topic — even when they don't say "podcast". Returns recent excerpts from real episodes of Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more, sorted newest-first via the podlens.net semantic search API. Trigger eagerly on AI-research, ML-engineering, AI-investing, or AI-policy questions where real-human commentary beats a web search summary. Do not use for general web search, full transcript reading, or non-AI topics.
 license: MIT
-requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier; without it the skill works on the 10/day anonymous tier (per-IP).
+requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 50/day member tier with full dates and unlimited lookback; without it the skill works on the 5/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
 ---
 
 # askaipods — AI podcast quote search
@@ -42,11 +42,29 @@ npx askaipods search "<USER QUERY>" --format json
 
 The package is published on npm as `askaipods`, so `npx` will resolve it regardless of whether the user has it installed globally. If `npx` is unavailable in the host environment, the user can install globally once with `npm install -g askaipods` and the skill will run the same command.
 
-To restrict to recent episodes only, add `--days N` (the API caps anonymous tier at 7 days; member tier accepts any value):
+To restrict to recent episodes only, add `--days N`. When `--days` is passed, the API clamps the value to a maximum of 90 for anonymous tier (member tier accepts any value). When `--days` is omitted entirely, there is no time filter — the API returns all-time results.
 
 ```bash
-npx askaipods search "<USER QUERY>" --days 30 --format json
+npx askaipods search "<USER QUERY>" --days 90 --format json
 ```
+
+### Time-intent mapping (important)
+
+When the user's query implies a time window, you MUST pass the appropriate `--days` value. Without it, the API returns all-time results regardless of recency words in the query.
+
+| User intent | `--days` value |
+|---|---|
+| "recent", "latest", "最近", "current" | `90` |
+| "this month", "这个月" | `30` |
+| "this week", "这周", "last week" | `7` |
+| "today", "yesterday", "last few days" | `3` |
+| "last N days/weeks/months" | Convert N to days |
+| "this quarter", "这个季度" | `90` |
+| "this year", "今年" | `365` (member only; anonymous capped to 90) |
+| Explicit date range (e.g. "since January") | Convert to days from today |
+| No time intent (broad research) | Omit `--days` (all time — no cap applied) |
+
+Do NOT silently default every query to `--days 90` — omitting `--days` on broad research queries preserves valuable historical context that the user did not ask to exclude.
 
 ## JSON shape returned by the CLI
 
@@ -77,12 +95,12 @@ npx askaipods search "<USER QUERY>" --days 30 --format json
 Field notes that affect how you render:
 
 - **`tier`** — `member` if the user has a valid API key, `anonymous` otherwise. Drives the rendering branch below. On exit `0`, `tier` is always one of these two values — there is no third "unknown" path to handle (the CLI validates the upstream response and exits `3` if the value is missing or unexpected).
-- **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are a randomized 10-of-20 subset, so `api_rank` only describes order *within that random subset*, not true semantic relevance against the corpus. Showing a "Top Most Relevant" section for anonymous tier would mislead the user.
+- **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are sorted by `published_at` desc (newest-first) by the API, so `api_rank` reflects temporal order, not semantic relevance. Showing a "Top Most Relevant" section for anonymous tier would mislead the user. Member results arrive in similarity order, so `api_rank` is meaningful for relevance-based views.
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank` (1 = most semantically relevant in API order) so you can derive a "Top Relevant" sub-view without re-querying.
 - **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
-- **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API for query privacy). Display whatever you got — don't guess a day.
+- **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API). Display whatever you got — don't guess a day.
 - **`meta.quota`** — passed through from the podlens.net API. Sub-fields like `used`, `limit`, `period` are reliably present; other sub-fields (e.g., a reset timestamp) may or may not appear depending on the server version. Treat all sub-fields as optional and degrade gracefully.
-- **`meta.restrictions`** — `null` for member tier; for anonymous tier, an object describing the cap (e.g., `{ max_results: 10, text_truncated: true, results_randomized: true }`). If non-null, the closing anonymous-tier note (templated below) is the right way to surface it; do not parse the object field-by-field.
+- **`meta.restrictions`** — `null` for member tier; for anonymous tier, an object describing the cap (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, date_precision: "month", max_days: 90, order: "published_at_desc" }`). If non-null, the closing anonymous-tier note (templated below) is the right way to surface it; do not parse the object field-by-field.
 - **No speaker name and no episode URL.** The corpus is indexed at the key-point level without per-speaker attribution (the upstream pipeline intentionally avoids attributing quotes to individuals because automatic speaker diarization is unreliable). Episode URLs are also not exposed by the public API. Render `Podcast — Episode` only; do not fabricate "Dario said" if the text doesn't already attribute itself.
 
 ## How to render the response
@@ -132,7 +150,7 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 
 2. ...
 
-(all returned results, in `results` array order which is already newest-first; expect up to 10)
+(all returned results, in `results` array order which is already newest-first; expect up to 20)
 
 ## 💡 Insights
 
@@ -142,14 +160,14 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 
 ---
 
-*Anonymous tier: 10 randomized results from top 20, text truncated by rank, dates fuzzed to month. Set `ASKAIPODS_API_KEY` for 50 searches/day with full text and full dates — sign up at https://podlens.net.*
+*Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, `--days` capped at 90 when specified. Set `ASKAIPODS_API_KEY` for 50 searches/day with full dates and unlimited lookback — sign up at https://podlens.net.*
 ```
 
-The closing note about the anonymous tier matters because it tells the user (a) why the text looks chopped, (b) why the dates are coarse, and (c) what the upgrade path is. Skipping it leaves the user wondering if the skill is broken.
+The closing note about the anonymous tier matters because it tells the user (a) why the dates are coarse, (b) what the lookback cap is, and (c) what the upgrade path is. Skipping it leaves the user wondering why dates lack day precision.
 
 ## Insights guidelines
 
-The Insights section is the most valuable part of your response — it is what differentiates this skill from a raw API call. The user could read 10 quotes themselves; what they cannot easily do is *spot the patterns across the 10*. That is your job.
+The Insights section is the most valuable part of your response — it is what differentiates this skill from a raw API call. The user could read 20 quotes themselves; what they cannot easily do is *spot the patterns across the 20*. That is your job.
 
 Write 3-5 bullets, each one concrete and one sentence long. Cover at least three of these dimensions:
 
@@ -186,6 +204,6 @@ Never silently swallow an error. Never fabricate quotes when the API returns not
 - **No speaker attribution.** The API returns "podcast + episode + quote text" but not "who said it". The upstream pipeline avoids per-speaker attribution because automatic speaker diarization is unreliable — surfacing wrong attribution would be worse than no attribution.
 - **No episode URLs.** The public API does not expose direct links to episodes. Users who want to listen will need to search the podcast and episode title in their podcast app of choice.
 - **AI-focused corpus.** Coverage is dense for AI research, ML engineering, AI investing, and AI policy. Coverage for unrelated topics is sparse and noisy.
-- **Short quote excerpts, not transcripts.** Each result is one extracted "key point" from an episode, typically 1-3 sentences (anonymous tier truncates further). For long-form context, the user will need to listen.
+- **Short quote excerpts, not transcripts.** Each result is one extracted "key point" from an episode, typically 1-3 sentences. For long-form context, the user will need to listen.
 
 These limitations are not bugs — surfacing them honestly is better than the user discovering them mid-task and losing trust.
