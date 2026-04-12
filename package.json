@@ -1,0 +1,55 @@
+{
+  "name": "askaipods",
+  "version": "0.1.0",
+  "description": "Search AI podcast quotes by topic — find what Lex Fridman, Dwarkesh, No Priors, and Latent Space guests are actually saying. Universal agentskills.io skill compatible with Claude Code, Codex, Cursor, OpenCode, Hermes, OpenClaw, and more. Powered by podlens.net.",
+  "type": "module",
+  "bin": {
+    "askaipods": "./bin/askaipods.js"
+  },
+  "main": "./src/cli.js",
+  "exports": {
+    ".": "./src/cli.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "skill",
+    "examples",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node bin/askaipods.js",
+    "test": "node --test tests/"
+  },
+  "keywords": [
+    "ai",
+    "podcasts",
+    "search",
+    "agent-skill",
+    "agentskills",
+    "claude-code",
+    "codex",
+    "cursor",
+    "opencode",
+    "hermes",
+    "openclaw",
+    "podlens",
+    "semantic-search",
+    "llm-tools",
+    "agentic"
+  ],
+  "author": "Delibread0601",
+  "license": "MIT",
+  "homepage": "https://github.com/Delibread0601/askaipods#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Delibread0601/askaipods.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Delibread0601/askaipods/issues"
+  }
+}
