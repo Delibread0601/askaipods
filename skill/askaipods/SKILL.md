@@ -98,7 +98,8 @@ Do NOT silently default every query to `--days 90` — omitting `--days` on broa
     "total_returned": 20,
     "quota": { "used": 3, "limit": 50, "period": "daily" },
     "restrictions": null,
-    "query_hash": "..."
+    "query_hash": "...",
+    "window": { "requested_days": 7, "served_days": 30, "expanded": true, "reason_code": "expanded_on_empty_window" }
   }
 }
 ```
@@ -113,6 +114,7 @@ Field notes that affect how you render:
 - **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API). Display whatever you got — don't guess a day.
 - **`meta.quota`** — passed through from the podlens.net API. Sub-fields like `used`, `limit`, `period` are reliably present; other sub-fields (e.g., a reset timestamp) may or may not appear depending on the server version. Treat all sub-fields as optional and degrade gracefully.
 - **`meta.restrictions`** — `null` for member tier; for anonymous tier, an object describing the cap (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, date_precision: "month", max_days: 90, order: "published_at_desc" }`). If non-null, the closing anonymous-tier note (templated below) is the right way to surface it; do not parse the object field-by-field.
+- **`meta.window`** — present when the API includes window expansion metadata (may be `null` for older server versions). When the user passes `--days` and the requested window has no results, the API automatically retries with wider windows (`[30, 60, 90]` days). The `window` object contains: `requested_days` (what was asked), `served_days` (what actually returned results), `expanded` (boolean — `true` when the window was widened), `reason_code` (`"expanded_on_empty_window"` when expanded), and optionally `truncated` (`true` when a fallback query errored mid-expansion). **When `expanded` is `true`**, tell the user: "No results in the requested N-day window; showing results from the last M days" (using `requested_days` and `served_days`). When `expanded` is `false` and results are empty, the API tried all available windows and genuinely found nothing.
 - **No speaker name and no episode URL.** The corpus is indexed at the key-point level without per-speaker attribution (the upstream pipeline intentionally avoids attributing quotes to individuals because automatic speaker diarization is unreliable). Episode URLs are also not exposed by the public API. Render `Podcast — Episode` only; do not fabricate "Dario said" if the text doesn't already attribute itself.
 
 ## How to render the response
@@ -207,7 +209,11 @@ The CLI uses stable exit codes so you can branch on the failure mode:
 | `2` | Daily quota exhausted | Surface the CLI's stderr message verbatim — it is already tier-aware (distinct copy for member vs anonymous) and includes the correct reset time and upgrade path. |
 | `3` | Transient or unexpected failure (network error, rate-limit burst, service 503, protocol/shape error, or internal exception) | Retry once after a brief pause. If it fails again, surface the CLI's stderr message verbatim — it distinguishes "rate limited, retry in a minute" from "podlens.net temporarily unavailable" from "unexpected response shape" from internal exceptions, so the user sees the actionable detail. |
 
-If the `results` array is empty (zero matches above the similarity threshold), say so explicitly: "No quotes found for that topic. The corpus is AI-focused — for non-AI topics, try a web search instead. For AI topics, try rephrasing or broadening the query." Do not invent quotes to fill the gap.
+If the `results` array is empty (zero matches above the similarity threshold), check `meta.window` first:
+- If `meta.window.expanded` is `true`: the API already widened the search window (e.g., from 7 to 30 days) and still found nothing — tell the user: "No quotes found. The API expanded the search from N to M days but found no matches. Try rephrasing or broadening the query."
+- If `meta.window.truncated` is `true`: the expansion was interrupted by a transient error — tell the user to retry in a moment.
+- Otherwise (no expansion, or `meta.window` is `null`): say "No quotes found for that topic. The corpus is AI-focused — for non-AI topics, try a web search instead. For AI topics, try rephrasing or broadening the query."
+Do not invent quotes to fill the gap.
 
 Never silently swallow an error. Never fabricate quotes when the API returns nothing.
 

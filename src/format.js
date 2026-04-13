@@ -91,6 +91,7 @@ export function toStructured(query, response) {
       quota: response.meta.quota,
       restrictions: response.meta.restrictions ?? null,
       query_hash: response.meta.query_hash ?? null,
+      window: response.meta.window ?? null,
     },
   };
 }
@@ -115,12 +116,32 @@ export function renderMarkdown(query, response) {
   lines.push("");
 
   if (data.results.length === 0) {
-    lines.push("No results found. Try a different phrasing or broader topic.");
+    const win = data.meta.window;
+    if (win && win.expanded) {
+      lines.push(
+        `No results found. The API expanded the search window from ${win.requested_days} to ${win.served_days} days but still found no matches. Try a different phrasing or broader topic.`,
+      );
+    } else if (win && win.truncated) {
+      lines.push(
+        "No results found (search window expansion was interrupted by a transient error). Try again in a moment, or try a different phrasing.",
+      );
+    } else {
+      lines.push("No results found. Try a different phrasing or broader topic.");
+    }
     if (data.tier === "anonymous") {
       lines.push("");
       lines.push(`> ${ANONYMOUS_NOTE}`);
     }
     return lines.join("\n");
+  }
+
+  // Surface window expansion so the user knows the actual time range
+  const win = data.meta.window;
+  if (win && win.expanded) {
+    lines.push(
+      `*Note: No results in the requested ${win.requested_days}-day window; showing results from the last ${win.served_days} days.*`,
+    );
+    lines.push("");
   }
 
   lines.push("## Results — newest first");

@@ -99,7 +99,8 @@ function isValidPublishedAt(v) {
 //
 // Optional (kept loose on purpose):
 //   data.meta.quota.period, data.meta.quota.next_reset,
-//   data.meta.query_hash, data.meta.restrictions, data.meta.cta
+//   data.meta.query_hash, data.meta.restrictions, data.meta.cta,
+//   data.meta.window
 function isValidSuccessEnvelope(data) {
   if (!isPlainObject(data)) return false;
   if (typeof data.total !== "number" || !Number.isFinite(data.total)) return false;
@@ -136,7 +137,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.2.2 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.2.3 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
