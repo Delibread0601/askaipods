@@ -31,8 +31,9 @@ jobs:
       - name: Check if tag exists
         if: steps.version.outputs.changed == 'true'
         id: tag-check
+        env:
+          TAG: ${{ steps.version.outputs.current }}
         run: |
-          TAG="${{ steps.version.outputs.current }}"
           if git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
@@ -41,8 +42,9 @@ jobs:
 
       - name: Create tag
         if: steps.version.outputs.changed == 'true' && steps.tag-check.outputs.exists == 'false'
+        env:
+          TAG: ${{ steps.version.outputs.current }}
         run: |
-          TAG="${{ steps.version.outputs.current }}"
           git tag "$TAG"
           git push origin "$TAG"
-          echo "✅ Created tag ${TAG}"
+          echo "Created tag ${TAG}"
