@@ -13,7 +13,7 @@
 
 const ANONYMOUS_NOTE =
   "Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, " +
-  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 50 searches/day with full dates and unlimited lookback.";
+  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day with full dates and unlimited lookback.";
 
 // Sort results newest-first by parsing each `published_at` to a UTC
 // millisecond timestamp and comparing numerically. Pure lexical compare

@@ -45,7 +45,7 @@ Claude Code should recognize the trigger phrase, run `npx askaipods search "..."
 
 - **Skill not appearing**: Make sure the parent directory name matches the `name` field in `SKILL.md` (both must be `askaipods`).
 - **`npx askaipods` fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The CLI uses zero dependencies so there are no other prereqs.
-- **Anonymous quota exhausted**: Sign up at https://podlens.net for 50/day, then `export ASKAIPODS_API_KEY=pk_xxx`.
+- **Anonymous quota exhausted**: Sign up at https://podlens.net for 100/day, then `export ASKAIPODS_API_KEY=pk_xxx`.
 - **Skill triggers too rarely**: Front-load your prompt with the trigger phrases in `SKILL.md` description, or invoke directly with `/askaipods <query>`.
 
 ## Reference

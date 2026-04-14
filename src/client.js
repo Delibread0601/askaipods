@@ -190,15 +190,15 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
   // Distinguish 429 cases by inspecting the message: the server uses
   // distinct strings for "burst limit hit" vs "daily quota exhausted",
   // and only the latter warrants the "daily quota" exit code. The
-  // quota message is tier-aware: a member hitting the 50/day cap must
+  // quota message is tier-aware: a member hitting the 100/day cap must
   // not be told to "set ASKAIPODS_API_KEY" — they already have one.
   if (response.status === 429) {
     const msg = String(data?.error ?? "").toLowerCase();
     if (msg.includes("quota")) {
       const quotaMsg = apiKey
-        ? "daily search quota exhausted (member tier: 50/day). Quota resets at 00:00 UTC."
-        : "daily search quota exhausted (anonymous tier: 10/day). Quota resets at 00:00 UTC. " +
-          "For 50 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).";
+        ? "daily search quota exhausted (member tier: 100/day). Quota resets at 00:00 UTC."
+        : "daily search quota exhausted (anonymous tier: 20/day). Quota resets at 00:00 UTC. " +
+          "For 100 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).";
       throw exitErr(2, quotaMsg);
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");

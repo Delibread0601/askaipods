@@ -30,8 +30,8 @@ OPTIONS:
   -v, --version              Show version
 
 ENVIRONMENT:
-  ASKAIPODS_API_KEY          PodLens API key. Without it: 10 searches/day per IP (anonymous).
-                             With it: 50 searches/day per user (member).
+  ASKAIPODS_API_KEY          PodLens API key. Without it: 20 searches/day per IP (anonymous).
+                             With it: 100 searches/day per user (member).
                              Sign up at https://podlens.net to get one.
 
 EXIT CODES:
