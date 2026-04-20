@@ -1,6 +1,6 @@
 # askaipods — project instructions
 
-A zero-dependency npm CLI (`askaipods`) and companion [agentskills.io](https://agentskills.io) skill that wraps the [podlens.net](https://podlens.net) semantic search API, returning recent quote excerpts from AI podcasts. Distributed as a global CLI via `npx` / `npm install` and as a skill drop-in under `~/.claude/skills/`, `~/.codex/skills/`, `~/.openclaw/skills/`, `~/.hermes/skills/`.
+A zero-dependency npm CLI (`askaipods`) and companion [agentskills.io](https://agentskills.io) skill that wraps the [podlens.net](https://podlens.net) semantic search API, returning recent quote excerpts from AI podcasts. Distributed as a global CLI via `npx` / `npm install` and as a skill drop-in under each runtime's `skills/` directory (`~/.claude/skills/`, `~/.codex/skills/`, `~/.openclaw/skills/` or `~/.agents/skills/`, `~/.hermes/skills/`). README holds the authoritative per-runtime path table.
 
 ## Release notes style
 
