@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.2.4";
+const VERSION = "0.2.5";
 
 const HELP_TEXT = `askaipods ${VERSION} — search AI podcast quotes by topic
 
@@ -32,7 +32,7 @@ OPTIONS:
 ENVIRONMENT:
   ASKAIPODS_API_KEY          PodLens API key. Without it: 20 searches/day per IP (anonymous).
                              With it: 100 searches/day per user (member).
-                             Sign up at https://podlens.net to get one.
+                             Member tier is invite-only — request access at https://podlens.net.
 
 EXIT CODES:
   0  success
@@ -87,8 +87,22 @@ export async function run(argv) {
   // operation today and adding it as a flag-free first positional means
   // future subcommands (e.g., `askaipods quota`) won't break the v0
   // muscle memory.
+  //
+  // Only strip "search" as a subcommand when there are additional
+  // positionals after it (audit R6-02). Treating a lone `search`
+  // positional as a subcommand would produce a misleading "missing
+  // query" error for the plausible case `askaipods search` (user
+  // typed the subcommand name expecting an interactive prompt); and
+  // stripping a leading `search` from a multi-word unquoted query
+  // like `askaipods search engines and AI` would silently drop the
+  // first word without the user noticing. The refined rule: if the
+  // user types exactly one positional equal to "search", treat it as
+  // the literal one-word query "search" rather than a subcommand
+  // with missing argument. For multi-word queries beginning with the
+  // literal word "search", the user should quote:
+  // `askaipods "search engines and AI"`.
   let query;
-  if (positionals[0] === "search") {
+  if (positionals[0] === "search" && positionals.length > 1) {
     query = positionals.slice(1).join(" ").trim();
   } else {
     query = positionals.join(" ").trim();

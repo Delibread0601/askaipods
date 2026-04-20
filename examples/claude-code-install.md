@@ -39,13 +39,13 @@ Or trigger it organically:
 
 > What are people saying about test-time compute on AI podcasts?
 
-Claude Code should recognize the trigger phrase, run `npx askaipods search "..." --format json`, parse the response, and render the structured results per the SKILL.md template (layout is tier-dependent — member tier shows Latest + Top Relevant + Insights; anonymous tier shows Recent Quotes + Insights).
+Claude Code should recognize the trigger phrase, run `npx -y askaipods search --format json -- "..."` (argv-style per SKILL.md's invocation rule), parse the response, and render the structured results per the SKILL.md template (layout is tier-dependent — member tier shows Latest + Top Relevant + Insights; anonymous tier shows Recent Quotes + Insights).
 
 ## Troubleshooting
 
 - **Skill not appearing**: Make sure the parent directory name matches the `name` field in `SKILL.md` (both must be `askaipods`).
 - **`npx askaipods` fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The CLI uses zero dependencies so there are no other prereqs.
-- **Anonymous quota exhausted**: Sign up at https://podlens.net for 100/day, then `export ASKAIPODS_API_KEY=pk_xxx`.
+- **Anonymous quota exhausted**: Member tier is invite-only — request access at https://podlens.net, then once invited `export ASKAIPODS_API_KEY=pk_xxx` for 100/day.
 - **Skill triggers too rarely**: Front-load your prompt with the trigger phrases in `SKILL.md` description, or invoke directly with `/askaipods <query>`.
 
 ## Reference

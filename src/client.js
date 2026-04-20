@@ -97,10 +97,24 @@ function isValidPublishedAt(v) {
 //   data.meta.quota.used       : finite number
 //   data.meta.quota.limit      : finite number
 //
-// Optional (kept loose on purpose):
+// Optional (kept loose on purpose unless they affect render logic):
 //   data.meta.quota.period, data.meta.quota.next_reset,
-//   data.meta.query_hash, data.meta.restrictions, data.meta.cta,
-//   data.meta.window
+//   data.meta.query_hash, data.meta.restrictions, data.meta.window
+//
+// Optional but shape-checked because they drive conditional render
+// branches in format.js — a malformed value would let the bad state
+// silently cross the exit-0 / exit-3 boundary:
+//   data.meta.quota.refunded    — boolean iff present (drives header
+//                                 "· refunded" tag in renderMarkdown)
+//   data.meta.warning           — {code: string} iff present (drives
+//                                 empty-result priority ladder and the
+//                                 freshness banner in non-empty render)
+//   data.meta.corpus_freshness  — {newest_date: string|null} iff present
+//                                 (the "data as of X" signal)
+//   data.meta.cta               — object iff present (passthrough only,
+//                                 no render logic depends on its shape,
+//                                 but reject non-object so downstream
+//                                 type assumptions hold)
 function isValidSuccessEnvelope(data) {
   if (!isPlainObject(data)) return false;
   if (typeof data.total !== "number" || !Number.isFinite(data.total)) return false;
@@ -124,6 +138,98 @@ function isValidSuccessEnvelope(data) {
   if (!isPlainObject(q)) return false;
   if (typeof q.used !== "number" || !Number.isFinite(q.used)) return false;
   if (typeof q.limit !== "number" || !Number.isFinite(q.limit)) return false;
+  // quota.refunded is optional; when present it MUST be boolean. A
+  // string like "yes" would truthy-trigger the "· refunded" tag in
+  // format.js renderMarkdown header, claiming a refund that didn't
+  // happen.
+  if (q.refunded !== undefined && typeof q.refunded !== "boolean") return false;
+  // warning is optional; when present it MUST be a plain object with a
+  // string `code`. A non-string code would bypass the equality checks
+  // in format.js empty-result ladder and non-empty banner, producing
+  // no user-facing message when one was intended.
+  if (m.warning != null) {
+    if (!isPlainObject(m.warning)) return false;
+    if (typeof m.warning.code !== "string") return false;
+  }
+  // corpus_freshness is optional. The server contract is **best-effort
+  // metadata**: when the upstream freshness probe fails, semantic.ts
+  // emits `console.warn` and continues with `newest_date: null` rather
+  // than aborting the request. The client must mirror that philosophy
+  // — a malformed `newest_date` should NOT turn an otherwise-successful
+  // search (valid results + tier + quota) into an exit-3 error.
+  //
+  // Split into two levels:
+  //   - Structural (object shape, type of newest_date): envelope-fatal
+  //     via `return false`. A non-string newest_date means the server
+  //     broke contract shape-wise.
+  //   - Content (non-ISO / non-calendar-valid YYYY-MM-DD): coerce
+  //     `newest_date` to null in place. format.js banner treats null
+  //     as "no freshness data" and omits the "newest indexed episode:
+  //     X" suffix cleanly.
+  if (m.corpus_freshness != null) {
+    if (!isPlainObject(m.corpus_freshness)) return false;
+    // `newest_date` is a required sub-field when corpus_freshness is
+    // present (SKILL.md contract: always present as string|null). An
+    // absent property is a protocol break — without this presence
+    // check, the `nd != null` guard below would early-exit for
+    // undefined after R4's structural/content split, letting a {}-
+    // shaped corpus_freshness leak through (R5-01).
+    if (!("newest_date" in m.corpus_freshness)) return false;
+    const nd = m.corpus_freshness.newest_date;
+    if (nd != null) {
+      if (typeof nd !== "string") return false;
+      let isoValid = /^\d{4}-\d{2}-\d{2}$/.test(nd);
+      if (isoValid) {
+        const [y, mo, d] = nd.split("-").map(Number);
+        if (mo < 1 || mo > 12 || d < 1 || d > 31) {
+          isoValid = false;
+        } else {
+          const dt = new Date(Date.UTC(y, mo - 1, d));
+          if (
+            dt.getUTCFullYear() !== y ||
+            dt.getUTCMonth() !== mo - 1 ||
+            dt.getUTCDate() !== d
+          ) {
+            isoValid = false;
+          }
+        }
+      }
+      if (!isoValid) {
+        // Coerce malformed ISO content to null and continue validation.
+        // Downstream format.js sees null and skips the freshness banner
+        // suffix, matching the server's own probe-failure degradation.
+        m.corpus_freshness.newest_date = null;
+      }
+    }
+  }
+  // cta is passthrough-only (no render logic reads its fields today),
+  // but reject non-object so future render paths don't crash on a
+  // primitive where they expect an object.
+  if (m.cta != null && !isPlainObject(m.cta)) return false;
+  // window shape-check (R3-01): format.js renderMarkdown reads
+  // `window.truncated`, `window.expanded`, `window.requested_days`,
+  // `window.served_days` to drive the empty-result priority ladder.
+  // A malformed window (e.g., `expanded: "true"` string, missing
+  // requested_days) would silently misroute rendering — e.g., a
+  // string "false" is truthy and would trigger the expanded branch
+  // when the server meant the opposite. Required fields are validated
+  // strictly; truncated/reason_code/attempted_days are optional and
+  // only checked when present.
+  if (m.window != null) {
+    if (!isPlainObject(m.window)) return false;
+    const w = m.window;
+    if (typeof w.requested_days !== "number" || !Number.isFinite(w.requested_days)) return false;
+    if (typeof w.served_days !== "number" || !Number.isFinite(w.served_days)) return false;
+    if (typeof w.expanded !== "boolean") return false;
+    if (w.truncated !== undefined && typeof w.truncated !== "boolean") return false;
+    if (w.reason_code !== undefined && typeof w.reason_code !== "string") return false;
+    if (w.attempted_days !== undefined) {
+      if (!Array.isArray(w.attempted_days)) return false;
+      for (const n of w.attempted_days) {
+        if (typeof n !== "number" || !Number.isFinite(n)) return false;
+      }
+    }
+  }
   return true;
 }
 
@@ -137,7 +243,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.2.4 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.2.5 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
@@ -148,28 +254,70 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
     body.days = days;
   }
 
+  // 30s total budget covers both connection setup and body consumption
+  // (audit R7-02). podlens.net edge workers may take 5-10s for the
+  // Vectorize + Gemini embed round-trip on cold starts; 30s leaves
+  // comfortable headroom while still producing a deterministic
+  // exit-3 instead of hanging a CLI invocation indefinitely on a
+  // half-open socket or unresponsive upstream. Applied via
+  // AbortSignal.timeout() so the signal covers the downstream
+  // `response.json()` body read as well — the same controller
+  // aborts whichever phase happens to be pending.
+  const TIMEOUT_MS = 30_000;
   let response;
   try {
     response = await fetch(endpoint, {
       method: "POST",
       headers,
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
   } catch (err) {
-    // fetch() throws TypeError on DNS / connection failure / abort.
-    // Treat all of these as exit code 3 (transient/network) so the
-    // SKILL.md can advise "retry in a moment" instead of looking like
-    // a usage error.
+    // AbortSignal.timeout fires with DOMException(name: "TimeoutError")
+    // in modern runtimes; some Node 18 versions use AbortError. Treat
+    // both as distinct, user-actionable exit-3 failures with the
+    // concrete timeout budget in the message so the user/agent knows
+    // the failure mode (stalled network vs. DNS failure vs. 404).
+    const name = err?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw exitErr(
+        3,
+        `request to podlens.net timed out after ${TIMEOUT_MS / 1000}s (possible network stall or slow upstream). Retry in a moment.`,
+      );
+    }
+    // fetch() throws TypeError on DNS / connection failure. Treat as
+    // exit code 3 (transient/network) so the SKILL.md can advise
+    // "retry in a moment" instead of looking like a usage error.
     throw exitErr(3, `network error contacting podlens.net: ${err?.message ?? err}`);
   }
 
   // The server always responds with JSON for both success and error
   // paths (see jsonResponse() in functions/api/search/semantic.ts), so
   // a non-JSON body means an upstream proxy/CDN is in the way.
+  //
+  // Two distinct failure classes in this catch (audit R8-01):
+  //   1. TimeoutError/AbortError — headers arrived in time but the
+  //      body read stalled past the signal's 30s budget. The same
+  //      AbortSignal attached at fetch() propagates to the response
+  //      body stream, so timeouts during `response.json()` surface
+  //      here rather than at the fetch() catch above.
+  //   2. Anything else — real JSON parse failure or truncated body
+  //      (e.g., an upstream proxy returned HTML or closed the
+  //      connection mid-stream).
+  // Must distinguish because the user-actionable advice differs:
+  // "retry, your network stalled" vs. "retry, an upstream proxy
+  // mangled the response."
   let data;
   try {
     data = await response.json();
-  } catch {
+  } catch (err) {
+    const name = err?.name;
+    if (name === "TimeoutError" || name === "AbortError") {
+      throw exitErr(
+        3,
+        `request to podlens.net timed out after ${TIMEOUT_MS / 1000}s while reading response body (possible network stall or slow upstream). Retry in a moment.`,
+      );
+    }
     throw exitErr(
       3,
       `unexpected non-JSON response from podlens.net (HTTP ${response.status}). ` +
@@ -198,7 +346,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
       const quotaMsg = apiKey
         ? "daily search quota exhausted (member tier: 100/day). Quota resets at 00:00 UTC."
         : "daily search quota exhausted (anonymous tier: 20/day). Quota resets at 00:00 UTC. " +
-          "For 100 searches/day, set ASKAIPODS_API_KEY (sign up at https://podlens.net).";
+          "For 100 searches/day, set ASKAIPODS_API_KEY — member tier is invite-only, request access at https://podlens.net.";
       throw exitErr(2, quotaMsg);
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");

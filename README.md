@@ -60,12 +60,12 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 | Runtime | Skill folder | Install guide |
 |---|---|---|
 | Claude Code | `~/.claude/skills/askaipods/` | [examples/claude-code-install.md](examples/claude-code-install.md) |
-| OpenAI Codex CLI | `~/.agents/skills/askaipods/` ✨ | [examples/codex-install.md](examples/codex-install.md) |
-| OpenClaw | `~/.agents/skills/askaipods/` ✨ or `~/.openclaw/skills/askaipods/` | [examples/openclaw-install.md](examples/openclaw-install.md) |
+| OpenAI Codex CLI | `~/.codex/skills/askaipods/` (or `$CODEX_HOME/skills/askaipods/`; project-scoped: `.agents/skills/askaipods/`) | [examples/codex-install.md](examples/codex-install.md) |
+| OpenClaw | `~/.agents/skills/askaipods/` or `~/.openclaw/skills/askaipods/` | [examples/openclaw-install.md](examples/openclaw-install.md) |
 | Hermes Agent | `~/.hermes/skills/askaipods/` | [examples/hermes-install.md](examples/hermes-install.md) |
 | Any other agentskills.io-compatible runtime | per runtime docs | follow the agentskills.io standard — copy `skill/askaipods/` into your agent's skills directory |
 
-✨ **Two-for-one tip**: Codex CLI and OpenClaw both read from `~/.agents/skills/`, so a single install at `~/.agents/skills/askaipods/` covers both runtimes simultaneously.
+**Per-runtime paths matter**: Codex CLI loads user-level skills from `~/.codex/skills/` (per the [official Codex skills docs](https://developers.openai.com/codex/skills)); project-scoped skills live under `.agents/skills/` in the repository and are discovered via workspace walk. OpenClaw typically reads from `~/.agents/skills/` or `~/.openclaw/skills/`. These paths are NOT interchangeable — install into each runtime's expected location.
 
 The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout is tier-dependent — member tier renders **Latest 5** + **Top 5 Most Relevant** + **Insights**; anonymous tier renders **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for anonymous because the API returns results sorted by date, not by semantic relevance).
 
@@ -101,14 +101,14 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | | Anonymous (default) | Member |
 |---|---|---|
 | **Daily quota** | 20 searches per IP | 100 searches per user |
-| **Results returned** | 20 (deterministic top 20, sorted newest-first) | 20 (deterministic top 20, sorted by relevance) |
+| **Results returned** | Top 20 newest (API returns newest-first; `api_rank` = temporal order) | Top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text |
 | **Date precision** | Month only (`2025-10`) | Full date (`2025-10-15`) |
 | **`--days` cap (when specified)** | 90 days | Unlimited |
 | **Setup** | Nothing | `ASKAIPODS_API_KEY` env var |
-| **Sign up** | n/a | https://podlens.net |
+| **Access** | n/a | invite-only · request at https://podlens.net |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. Sign up for member access only when you outgrow the 20/day quota or need full dates and unlimited lookback.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. Member access is currently invite-only — request access at https://podlens.net (you'll be added to the waitlist for review) only if you outgrow the 20/day quota or need full dates and unlimited lookback.
 
 ## Honest limitations
 

@@ -22,7 +22,7 @@ In a Hermes session, ask:
 
 > Find what AI podcasts are saying about test-time compute
 
-Hermes should pick up the skill from `~/.hermes/skills/askaipods/`, shell out to `npx askaipods`, and present the structured results.
+Hermes should pick up the skill from `~/.hermes/skills/askaipods/`, shell out to `npx -y askaipods ...` (argv-style per SKILL.md's invocation rule), and present the structured results.
 
 ## Troubleshooting
 

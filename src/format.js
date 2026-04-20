@@ -13,7 +13,8 @@
 
 const ANONYMOUS_NOTE =
   "Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, " +
-  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day with full dates and unlimited lookback.";
+  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day with full dates and unlimited lookback " +
+  "(member tier is invite-only — request access at https://podlens.net).";
 
 // Sort results newest-first by parsing each `published_at` to a UTC
 // millisecond timestamp and comparing numerically. Pure lexical compare
@@ -92,6 +93,20 @@ export function toStructured(query, response) {
       restrictions: response.meta.restrictions ?? null,
       query_hash: response.meta.query_hash ?? null,
       window: response.meta.window ?? null,
+      // New honesty signals (server audit 2026-04-17 → 2026-04-19):
+      //   warning.code       — "corpus_stale_for_requested_window" or
+      //                        "index_metadata_stale"; tells the agent
+      //                        the empty/partial result is a freshness
+      //                        issue rather than a semantic mismatch.
+      //   corpus_freshness   — { newest_date: "YYYY-MM-DD" | null };
+      //                        lets the agent render "data as of X".
+      //   cta                — anonymous-tier call-to-action (e.g.
+      //                        follow URL) passed through unchanged.
+      // All three are optional — defaulted to null so the structured
+      // output shape is stable across server versions.
+      warning: response.meta.warning ?? null,
+      corpus_freshness: response.meta.corpus_freshness ?? null,
+      cta: response.meta.cta ?? null,
     },
   };
 }
@@ -112,18 +127,64 @@ export function renderMarkdown(query, response) {
   const quotaLabel = quota
     ? `${quota.used}/${quota.limit} ${quota.period ?? "daily"}`
     : "unknown";
-  lines.push(`*Tier: ${tierLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}*`);
+  // Server's P1-b narrow refund: when corpus is stale AND delivered
+  // results are empty, the quota slot is refunded (see server CLAUDE.md
+  // §Two-Tier Search Access). Surface as a trailing tag so the user
+  // knows the search was free — `quota.used` is already decremented
+  // upstream, so we only need the marker, not a separate count.
+  const refundedTag = data.meta.quota?.refunded ? " · refunded" : "";
+  lines.push(`*Tier: ${tierLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
   lines.push("");
 
   if (data.results.length === 0) {
     const win = data.meta.window;
-    if (win && win.expanded) {
+    const warningCode = data.meta.warning?.code;
+    const newest = data.meta.corpus_freshness?.newest_date;
+    // Priority: freshness warnings take precedence over window/expansion
+    // messaging because they tell the user something stronger — the
+    // corpus (not just their query phrasing) is the reason for the
+    // empty response.
+    // Priority ladder (must match SKILL.md §Error handling):
+    //   1. warning.code = corpus_stale_for_requested_window
+    //   2. warning.code = index_metadata_stale
+    //   3. warning.code = any other value (forward-compat, R6-01)
+    //   4. window.truncated (transient fallback error — retry)
+    //   5. window.expanded (API widened the window, still empty)
+    //   6. generic (no signal — likely semantic mismatch)
+    // truncated MUST be checked before expanded: when a fallback
+    // Vectorize query errors mid-expansion, both flags are true, and
+    // the truncated copy ("retry in a moment") is strictly more
+    // actionable than the expanded copy ("rephrase").
+    if (warningCode === "corpus_stale_for_requested_window") {
+      const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
       lines.push(
-        `No results found. The API expanded the search window from ${win.requested_days} to ${win.served_days} days but still found no matches. Try a different phrasing or broader topic.`,
+        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — try a longer \`--days\` value or omit it.`,
+      );
+    } else if (warningCode === "index_metadata_stale") {
+      lines.push(
+        "No results. Recently indexed episodes are still propagating to the search index — retry in a few minutes.",
+      );
+    } else if (warningCode) {
+      // Forward-compat: server may introduce new warning codes (audit
+      // R6-01). Preserve the signal rather than silently falling
+      // through to generic "rephrase" copy, which would mislead the
+      // user into thinking the empty result is their fault.
+      lines.push(
+        `No results. The server flagged a freshness issue with this search (code: ${warningCode}) — results may be incomplete or the requested window may be stale. Try omitting \`--days\` or retry in a few minutes.`,
       );
     } else if (win && win.truncated) {
       lines.push(
         "No results found (search window expansion was interrupted by a transient error). Try again in a moment, or try a different phrasing.",
+      );
+    } else if (win && win.expanded) {
+      // SKILL.md §Error handling step 4 mandates appending the
+      // corpus-indexed-through suffix when newest_date is present —
+      // an honest freshness signal distinct from the freshness warning
+      // (which would have landed on the warning branches above). Keeps
+      // CLI markdown and SKILL.md's agent render instructions aligned.
+      const indexedThrough = newest ? ` (corpus indexed through ${newest})` : "";
+      lines.push(
+        `No results found. The API expanded the search window from ${win.requested_days} to ${win.served_days} days but still found no matches${indexedThrough}. Try a different phrasing or broader topic.`,
       );
     } else {
       lines.push("No results found. Try a different phrasing or broader topic.");
@@ -133,6 +194,37 @@ export function renderMarkdown(query, response) {
       lines.push(`> ${ANONYMOUS_NOTE}`);
     }
     return lines.join("\n");
+  }
+
+  // Freshness warning (partial-results case): SKILL.md's meta.warning
+  // contract covers both empty AND partial responses. When results are
+  // present but the server still flags a freshness issue (e.g.,
+  // index_metadata_stale: fresh episodes exist but some haven't
+  // propagated to Vectorize yet), emit a banner above the results so
+  // the user knows the set is incomplete rather than authoritative.
+  // Placed before the expansion note so freshness signals dominate —
+  // same priority intent as the empty-branch ladder.
+  const warningCode = data.meta.warning?.code;
+  const newest = data.meta.corpus_freshness?.newest_date;
+  if (warningCode === "corpus_stale_for_requested_window") {
+    const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
+    lines.push(
+      `*Note: The indexed corpus has no episodes in the requested window${asOf} — results below may come from an expanded window. Try omitting \`--days\` for broader coverage.*`,
+    );
+    lines.push("");
+  } else if (warningCode === "index_metadata_stale") {
+    lines.push(
+      "*Note: Recently indexed episodes are still propagating to the search index — some relevant matches may be missing. Retry in a few minutes for complete coverage.*",
+    );
+    lines.push("");
+  } else if (warningCode) {
+    // Unknown server warning code (forward-compat, audit R6-01).
+    // Surface the raw code so the signal reaches the user rather
+    // than being silently dropped.
+    lines.push(
+      `*Note: Server flagged a freshness concern with this search (code: ${warningCode}) — results may be incomplete.*`,
+    );
+    lines.push("");
   }
 
   // Surface window expansion so the user knows the actual time range

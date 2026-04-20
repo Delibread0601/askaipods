@@ -4,24 +4,26 @@
 
 1. `<workspace>/skills/` — workspace skills (highest)
 2. `<workspace>/.agents/skills/` — project agent skills
-3. `~/.agents/skills/` — personal agent skills (shared with OpenAI Codex CLI)
+3. `~/.agents/skills/` — personal agent skills
 4. `~/.openclaw/skills/` — managed/local skills (shared across all agents on the machine)
 
-For most users, **option 3 is the best choice** because the same `~/.agents/skills/askaipods/` install also makes the skill available in OpenAI Codex CLI — one install, two runtimes.
+> **Note**: An earlier version of this guide claimed `~/.agents/skills/` was shared with OpenAI Codex CLI. That was incorrect — Codex CLI reads user-level skills from `~/.codex/skills/` per the [official Codex skills docs](https://developers.openai.com/codex/skills). If you also use Codex CLI, install askaipods into `~/.codex/skills/askaipods/` separately (see [examples/codex-install.md](codex-install.md)).
 
-## Recommended install (shared with Codex)
+## Recommended install
+
+Install into the OpenClaw-native location (option 4 — lowest precedence, but stable across agent versions):
 
 ```bash
 git clone https://github.com/Delibread0601/askaipods.git ~/Code/askaipods
-mkdir -p ~/.agents/skills
-ln -s ~/Code/askaipods/skill/askaipods ~/.agents/skills/askaipods
-```
-
-If you don't already use Codex and prefer to keep OpenClaw skills separate, install into the OpenClaw-native location instead:
-
-```bash
 mkdir -p ~/.openclaw/skills
 ln -s ~/Code/askaipods/skill/askaipods ~/.openclaw/skills/askaipods
+```
+
+Or use the shared personal-skills location (option 3) if you want the skill visible to every agentskills.io-compatible runtime that respects the `~/.agents/skills/` convention:
+
+```bash
+mkdir -p ~/.agents/skills
+ln -s ~/Code/askaipods/skill/askaipods ~/.agents/skills/askaipods
 ```
 
 Or use the OpenClaw CLI once askaipods is published to the ClawHub registry (not yet — check back, or open an issue to track):
@@ -47,7 +49,7 @@ In OpenClaw, ask:
 
 > What are AI podcasts saying about reasoning models?
 
-OpenClaw should recognize the trigger phrase, shell out to `npx askaipods search "..." --format json`, and render the structured response per the SKILL.md template.
+OpenClaw should recognize the trigger phrase, shell out to `npx -y askaipods search --format json -- "..."` (argv-style per SKILL.md's invocation rule), and render the structured response per the SKILL.md template.
 
 ## Troubleshooting
 
