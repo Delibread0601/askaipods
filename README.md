@@ -80,7 +80,7 @@ askaipods "what are VCs saying about reasoning models"
 # JSON output (for scripts and agents)
 askaipods "Anthropic safety research" --format json
 
-# Restrict to recent episodes only (anonymous tier caps --days at 90; member tier accepts any value)
+# Restrict to recent episodes only (anonymous tier caps --days at 90; member tier caps at 365)
 askaipods "GPU shortage" --days 90
 
 # Use a member-tier API key for 100/day instead of 20/day
@@ -104,11 +104,11 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | **Results returned** | Top 20 newest (API returns newest-first; `api_rank` = temporal order) | Top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text |
 | **Date precision** | Month only (`2025-10`) | Full date (`2025-10-15`) |
-| **`--days` cap (when specified)** | 90 days | Unlimited |
+| **`--days` cap (when specified)** | 90 days | 365 days |
 | **Setup** | Nothing | `ASKAIPODS_API_KEY` env var |
 | **Access** | n/a | invite-only · request at https://podlens.net |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. Member access is currently invite-only — request access at https://podlens.net (you'll be added to the waitlist for review) only if you outgrow the 20/day quota or need full dates and unlimited lookback.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. Member access is currently invite-only — request access at https://podlens.net (you'll be added to the waitlist for review) only if you outgrow the 20/day quota or need full dates and the longer 365-day lookback window.
 
 ## Honest limitations
 

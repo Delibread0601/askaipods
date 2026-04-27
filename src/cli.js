@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.2.6";
+const VERSION = "0.2.7";
 
 const HELP_TEXT = `askaipods ${VERSION} — search AI podcast quotes by topic
 
@@ -24,7 +24,7 @@ USAGE:
 
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
-  --days <N>                 Only return results from the last N days (anonymous tier caps at 90; member tier accepts any value)
+  --days <N>                 Only return results from the last N days (anonymous tier caps at 90; member tier caps at 365)
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
   -h, --help                 Show this message
   -v, --version              Show version

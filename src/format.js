@@ -13,7 +13,7 @@
 
 const ANONYMOUS_NOTE =
   "Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, " +
-  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day with full dates and unlimited lookback " +
+  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day with full dates and lookback up to 365 days " +
   "(member tier is invite-only — request access at https://podlens.net).";
 
 // Sort results newest-first by parsing each `published_at` to a UTC

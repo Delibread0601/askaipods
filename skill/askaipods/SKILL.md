@@ -2,7 +2,7 @@
 name: askaipods
 description: Search AI podcast quotes about a topic. Use whenever the user asks "what are people saying about X", "latest takes on Y", "find AI podcast quotes about Z", "who is discussing <model/concept>", or wants to know how AI researchers, founders, or VCs are publicly discussing any AI topic — even when they don't say "podcast". Returns recent excerpts from Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more via podlens.net. Optional ASKAIPODS_API_KEY unlocks invite-only member tier; anonymous works out of the box.
 license: MIT
-requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 100/day member tier with full dates and unlimited lookback (member tier is invite-only — request access at https://podlens.net); without the key the skill works on the 20/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
+requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 100/day member tier with full dates and lookback up to 365 days (member tier is invite-only — request access at https://podlens.net); without the key the skill works on the 20/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
 ---
 
 # askaipods — AI podcast quote search
@@ -55,7 +55,7 @@ The `-y` flag bypasses npm's first-run confirmation prompt; without it, a non-in
 
 The `search` subcommand is optional — `npx -y askaipods --format json -- "<USER QUERY>"` works identically. Both forms are supported; use whichever reads better in context.
 
-To restrict to recent episodes only, add `--days N`. When `--days` is passed, the server caps the value at 90 for anonymous tier (member tier accepts any value). When `--days` is omitted entirely, there is no time filter — the server returns all-time results.
+To restrict to recent episodes only, add `--days N`. When `--days` is passed, the server caps the value at 90 for anonymous tier and at 365 for member tier (larger values are silently clamped — do NOT pass `--days 730` expecting a two-year window). When `--days` is omitted entirely, there is no time filter — the server returns all-time results.
 
 ```bash
 npx -y askaipods search --days 90 --format json -- "<USER QUERY>"
@@ -107,7 +107,7 @@ Do NOT silently default every query to `--days 90` — omitting `--days` on broa
   "meta": {
     "total_returned": 20,
     "quota": { "used": 3, "limit": 100, "period": "daily", "next_reset": "2026-04-21T00:00:00Z" },
-    "restrictions": null,
+    "restrictions": { "max_days": 365 },
     "query_hash": "...",
     "window": {
       "requested_days": 7,
@@ -132,7 +132,7 @@ Field notes that affect how you render:
 - **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
 - **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API). Display whatever you got — don't guess a day.
 - **`meta.quota`** — passed through from the podlens.net API. `used` and `limit` are guaranteed present (the CLI validates them as part of the success envelope); `period` is typically `"daily"`, `next_reset` is an ISO-8601 timestamp, and **`refunded`** (optional boolean) — when present and `true`, the server refunded this request's quota slot under its P1-b narrow-refund rule (triggered when the corpus is stale for the requested window AND zero results were delivered). The field is often absent; check with `quota.refunded === true` rather than `typeof quota.refunded === "boolean"`. When set, mention in the response that the search didn't count against the user's quota — it's a transparency signal worth surfacing.
-- **`meta.restrictions`** — `null` for member tier; for anonymous tier, an object describing the cap (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, date_precision: "month", max_days: 90, order: "published_at_desc" }`). If non-null, the closing anonymous-tier note (templated below) is the right way to surface it; do not parse the object field-by-field.
+- **`meta.restrictions`** — for member tier, an object describing the member cap (currently `{ max_days: 365 }`); for anonymous tier, a fuller object describing the anonymous restrictions (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, date_precision: "month", max_days: 90, order: "published_at_desc" }`). For anonymous tier, the closing anonymous-tier note (templated below) is the right way to surface the cap; for member tier, the field is informational only. Do not parse field-by-field, and do not branch tier on this field — use `meta.tier`.
 - **`meta.window`** — present when the API includes window expansion metadata (may be `null` for older server versions). When the user passes `--days` and the requested window has no results, the API automatically retries with wider windows (`[30, 60, 90]` days). The `window` object contains:
   - `requested_days` — what the client asked for.
   - `served_days` — the last window actually attempted. When `expanded` is `true`, results came from that wider window.
@@ -221,7 +221,7 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 
 ---
 
-*Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, `--days` capped at 90 when specified. Set `ASKAIPODS_API_KEY` for 100 searches/day with full dates and unlimited lookback — member tier is invite-only, request access at https://podlens.net.*
+*Anonymous tier: 20 results sorted newest-first, dates fuzzed to month, `--days` capped at 90 when specified. Set `ASKAIPODS_API_KEY` for 100 searches/day with full dates and lookback up to 365 days — member tier is invite-only, request access at https://podlens.net.*
 ```
 
 The closing note about the anonymous tier matters because it tells the user (a) why the dates are coarse, (b) what the lookback cap is, and (c) what the upgrade path is. Skipping it leaves the user wondering why dates lack day precision.
