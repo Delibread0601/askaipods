@@ -11,17 +11,17 @@ $ askaipods "what are people saying about test-time compute"
 
 ## Results — newest first
 
-### 1. Lenny's Podcast — AI Engineering 101 with Chip Huyen
-*2025-10*
+### 1. Machine Learning Street Talk — The AI That Replaces Hours of Model Tuning - Frank Hutter
+*2026-09-23* · https://www.youtube.com/watch?v=72Im-Mm5JKs
 
-> Test-time compute — spending more compute during inference by generating
-> multiple answers and selecting the best, or allowing more reasoning/thinking ...
+> Harness modes such as 'scaling mode' and 'thinking mode' use test-time
+> compute to handle larger and more complex data (Frank).
 
-### 2. Latent Space — Better Data is All You Need (Ari Morcos, Datology)
-*2025-08*
+### 2. Latent Space — The AI Memory Problem: Why Long Context Isn’t Enough — Dan Biderman, Engram Co-founder & CEO
+*2026-07-13* · https://www.youtube.com/watch?v=jhpmMTus5a0
 
-> Test-time compute as a paradigm pushes toward smaller base models because
-> the cost of solving a prob...
+> Dan believes solving very hard tasks in science, engineering, and defense
+> will eventually involve gradient-based updates during long-horizon tasks ...
 
 (...18 more results, newest-first...)
 ```
@@ -103,17 +103,16 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | **Daily quota** | 20 searches per IP | 100 searches per user |
 | **Results returned** | Top 20 newest (API returns newest-first; `api_rank` = temporal order) | Top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text |
-| **Date precision** | Month only (`2025-10`) | Full date (`2025-10-15`) |
 | **`--days` cap (when specified)** | 90 days | 365 days |
 | **Setup** | Nothing | `ASKAIPODS_API_KEY` env var |
 | **Access** | n/a | invite-only · request at https://podlens.net |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. Member access is currently invite-only — request access at https://podlens.net (you'll be added to the waitlist for review) only if you outgrow the 20/day quota or need full dates and the longer 365-day lookback window.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. Member access is currently invite-only — request access at https://podlens.net (you'll be added to the waitlist for review) only if you outgrow the 20/day quota or need relevance-ranked results and the longer 365-day lookback window.
 
 ## Honest limitations
 
 - **No speaker attribution.** The corpus indexes quotes at the episode level but does not attempt to identify *which guest* said each quote. The upstream pipeline avoids speaker labeling because automatic diarization is unreliable, and a wrong attribution is worse than no attribution.
-- **No episode URLs.** The public API does not expose direct podcast or episode links. You will need to search the podcast and episode title in your podcast app of choice.
+- **Episode links open the YouTube video, not the quote.** Each result carries the episode's YouTube watch URL (`url`, both tiers), which starts at the beginning of the episode — there is no timestamp for the quote. `url` is `null` for an episode without a link.
 - **AI-focused corpus.** Coverage is dense for AI research, ML engineering, AI investing, and AI policy. Off-topic queries return sparse, noisy results.
 - **Short quote excerpts.** Each result is typically 1-3 sentences. For long-form context, listen to the episode.
 

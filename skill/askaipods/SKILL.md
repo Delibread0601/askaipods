@@ -2,7 +2,7 @@
 name: askaipods
 description: Search AI podcast quotes about a topic. Use whenever the user asks "what are people saying about X", "latest takes on Y", "find AI podcast quotes about Z", "who is discussing <model/concept>", or wants to know how AI researchers, founders, or VCs are publicly discussing any AI topic — even when they don't say "podcast". Returns recent excerpts from Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, and dozens more via podlens.net. Optional ASKAIPODS_API_KEY unlocks invite-only member tier; anonymous works out of the box.
 license: MIT
-requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 100/day member tier with full dates and `--days` lookback up to 365 days (omit `--days` for all-time results); member tier is invite-only — request access at https://podlens.net. Without the key the skill works on the 20/day anonymous tier (per-IP, month-precision dates, `--days` capped at 90 when specified).
+requirements: Node.js 18.3.0+ on PATH (the CLI uses `node:util.parseArgs`, which was added in 18.3.0), internet access to podlens.net. Optional ASKAIPODS_API_KEY env var unlocks the 100/day member tier with `--days` lookback up to 365 days (omit `--days` for all-time results); member tier is invite-only — request access at https://podlens.net. Without the key the skill works on the 20/day anonymous tier (per-IP, `--days` capped at 90 when specified).
 ---
 
 # askaipods — AI podcast quote search
@@ -94,7 +94,7 @@ When the converted day count exceeds the tier cap (90 anonymous / 365 member), p
 
 ## JSON shape returned by the CLI
 
-The example below is a **member-tier** response. Anonymous-tier responses differ in: top-level `tier: "anonymous"`, `render_hint: "single_view"`, `results[].date` fuzzed to `"YYYY-MM"` precision, lower `meta.quota.limit` (20), and a fuller `meta.restrictions` object describing anonymous caps (see field notes below).
+The example below is a **member-tier** response. Anonymous-tier responses differ in: top-level `tier: "anonymous"`, `render_hint: "single_view"`, lower `meta.quota.limit` (20), and a fuller `meta.restrictions` object describing anonymous caps (see field notes below).
 
 ```json
 {
@@ -107,6 +107,7 @@ The example below is a **member-tier** response. Anonymous-tier responses differ
       "podcast": "Dwarkesh Patel",
       "episode": "Dario Amodei on the future of AI",
       "date": "2026-03-15",
+      "url": "https://www.youtube.com/watch?v=AbCdEfGhIjK",
       "text": "the actual quote excerpt ...",
       "api_rank": 1
     }
@@ -137,9 +138,10 @@ Field notes that affect how you render:
 - **`render_hint`** — `dual_view` for member, `single_view` for anonymous. Honor this. The reason: anonymous results are sorted by `published_at` desc (newest-first) by the API, so `api_rank` reflects temporal order, not semantic relevance. Showing a "Top Most Relevant" section for anonymous tier would mislead the user. Member results arrive in similarity order, so `api_rank` is meaningful for relevance-based views.
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank`, its position in the API's original ordering. **For member tier**, `api_rank` 1 = most semantically relevant — you can derive a "Top Relevant" sub-view without re-querying. **For anonymous tier**, the API sorts by date, so `api_rank` reflects temporal order (1 = newest), not relevance — see the `render_hint` note above for why a "Top Relevant" view should not be rendered for anonymous responses.
 - **`results[].podcast` / `episode` / `date`** — any of these may be `null` if the upstream record is incomplete. Render `Unknown podcast` / `Untitled episode` / `date unknown` rather than dropping the result. The CLI's own markdown renderer falls back the same way.
-- **`results[].date` format** — `YYYY-MM-DD` (or full ISO timestamp) for member tier; `YYYY-MM` only for anonymous tier (deliberately fuzzed by the API). Display whatever you got — don't guess a day.
+- **`results[].date` format** — `YYYY-MM-DD` (or a full ISO timestamp) on both tiers. Display whatever you got — if a date ever arrives as month-only `YYYY-MM` (older server versions sent that for anonymous tier), show it as is and don't guess a day.
+- **`results[].url`** — the episode's YouTube watch URL (`https://www.youtube.com/watch?v=<id>`), on both tiers. It opens the episode at the start, not at the quote. `null` when the source has no link (the CLI also nulls any value that isn't a YouTube watch URL); the key is missing entirely when an askaipods CLI older than 0.2.8 ran. Render it only as given — never build or guess a URL from the podcast or episode title.
 - **`meta.quota`** — passed through from the podlens.net API. `used` and `limit` are guaranteed present (the CLI validates them as part of the success envelope); `period` is typically `"daily"`, `next_reset` is an ISO-8601 timestamp, and **`refunded`** (optional boolean) — when present and `true`, the server refunded this request's quota slot under its P1-b narrow-refund rule (triggered when the corpus is stale for the requested window AND zero results were delivered). The field is often absent; check with `quota.refunded === true` rather than `typeof quota.refunded === "boolean"`. When set, mention in the response that the search didn't count against the user's quota — it's a transparency signal worth surfacing.
-- **`meta.restrictions`** — for member tier, an object describing the member cap (currently `{ max_days: 365 }`); for anonymous tier, a fuller object describing the anonymous restrictions (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, date_precision: "month", max_days: 90, order: "published_at_desc" }`). For anonymous tier, the closing anonymous-tier note (templated below) is the right way to surface the cap; for member tier, the field is informational only. Do not parse field-by-field, and do not branch tier on this field — use the top-level `tier` field.
+- **`meta.restrictions`** — for member tier, an object describing the member cap (currently `{ max_days: 365 }`); for anonymous tier, a fuller object describing the anonymous restrictions (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, max_days: 90, order: "published_at_desc" }`). For anonymous tier, the closing anonymous-tier note (templated below) is the right way to surface the cap; for member tier, the field is informational only. Do not parse field-by-field, and do not branch tier on this field — use the top-level `tier` field.
 - **`meta.window`** — present when the API includes window expansion metadata (may be `null` for older server versions). When the user passes `--days` and the requested window has no results, the API automatically retries with wider windows (`[30, 60, 90]` days). The `window` object contains:
   - `requested_days` — what the client asked for.
   - `served_days` — the last window actually attempted. When `expanded` is `true`, results came from that wider window.
@@ -159,13 +161,13 @@ Field notes that affect how you render:
 
   These warnings mean an empty or near-empty result is an infrastructure signal, not a semantic-relevance signal — they take precedence over `window.expanded`/`truncated` messaging when both apply.
 - **`meta.cta`** — anonymous-tier call-to-action from the server (e.g., `{ follow: "https://x.com/..." }`) or `null`. Optional context for the closing anonymous-tier note; safe to ignore if you're already rendering the standard closing note.
-- **No speaker name and no episode URL.** The corpus is indexed at the key-point level without per-speaker attribution (the upstream pipeline intentionally avoids attributing quotes to individuals because automatic speaker diarization is unreliable). Episode URLs are also not exposed by the public API. Render `Podcast — Episode` only; do not fabricate "Dario said" if the text doesn't already attribute itself.
+- **No speaker name.** The corpus is indexed at the key-point level without per-speaker attribution (the upstream pipeline intentionally avoids attributing quotes to individuals because automatic speaker diarization is unreliable). Render `Podcast — Episode` only; do not fabricate "Dario said" if the text doesn't already attribute itself.
 
 ## How to render the response
 
 Output exactly this structure. It is required for consistency across runtimes — users of this skill across Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agentskills.io-compatible agent should see the same shape regardless of which agent ran it.
 
-Note: parenthetical notes and `<placeholder>` tokens inside the fenced template blocks below are author guidance for the agent. Agents MUST replace placeholders with actual values from the JSON response, and MUST NOT include the parentheticals in the final user-facing output.
+Note: parenthetical notes and `<placeholder>` tokens inside the fenced template blocks below are author guidance for the agent. Agents MUST replace placeholders with actual values from the JSON response, and MUST NOT include the parentheticals in the final user-facing output. When a result's `url` is `null` or missing, drop the ` · [YouTube](<url>)` segment from its line instead of printing an empty or made-up link.
 
 (Note: the CLI's own `--format markdown` output uses a different layout — `### N. Podcast — Episode` headings — because that mode targets humans running `askaipods` directly in a terminal. As an agent you should always pass `--format json` and reformat the parsed payload yourself per the templates below; do not copy the CLI's markdown.)
 
@@ -182,7 +184,7 @@ The banner is mandatory whenever `meta.warning` is non-null and the response is 
 ```markdown
 ## 🆕 Latest 5
 
-1. **<podcast>** — *<episode>* · <date>
+1. **<podcast>** — *<episode>* · <date> · [YouTube](<url>)
    > "<quote text>"
 
 2. ...
@@ -191,7 +193,7 @@ The banner is mandatory whenever `meta.warning` is non-null and the response is 
 
 ## 🎯 Top 5 Most Relevant
 
-1. **<podcast>** — *<episode>* · <date>
+1. **<podcast>** — *<episode>* · <date> · [YouTube](<url>)
    > "<quote text>"
 
 2. ...
@@ -215,7 +217,7 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 ```markdown
 ## 🆕 Recent Quotes
 
-1. **<podcast>** — *<episode>* · <date>
+1. **<podcast>** — *<episode>* · <date> · [YouTube](<url>)
    > "<quote text>"
 
 2. ...
@@ -230,10 +232,10 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 
 ---
 
-*Anonymous tier: up to 20 results sorted newest-first, dates fuzzed to month, `--days` capped at 90 when specified. Set `ASKAIPODS_API_KEY` for 100 searches/day, full dates, and `--days` up to 365 (or omit for all-time) — member tier is invite-only, request access at https://podlens.net.*
+*Anonymous tier: up to 20 results sorted newest-first, `--days` capped at 90 when specified. Set `ASKAIPODS_API_KEY` for 100 searches/day and `--days` up to 365 (or omit for all-time) — member tier is invite-only, request access at https://podlens.net.*
 ```
 
-The closing note about the anonymous tier matters because it tells the user (a) why the dates are coarse, (b) what the lookback cap is, and (c) what the upgrade path is. Skipping it leaves the user wondering why dates lack day precision.
+The closing note about the anonymous tier matters because it tells the user (a) why there is no "Top Relevant" view and results stop at 20, (b) what the lookback cap is, and (c) what the upgrade path is. Skipping it leaves the user wondering why the view differs from a member's.
 
 ## Insights guidelines
 
@@ -283,7 +285,7 @@ Never silently swallow an error. Never fabricate quotes when the API returns not
 ## Honest limitations to set user expectations
 
 - **No speaker attribution.** The API returns "podcast + episode + quote text" but not "who said it". The upstream pipeline avoids per-speaker attribution because automatic speaker diarization is unreliable — surfacing wrong attribution would be worse than no attribution.
-- **No episode URLs.** The public API does not expose direct links to episodes. Users who want to listen will need to search the podcast and episode title in their podcast app of choice.
+- **Episode links open the YouTube video, not the quote.** `url` points to the start of the episode; there is no timestamp for where the quote is said. It can be `null` for an episode without a link.
 - **AI-focused corpus.** Coverage is dense for AI research, ML engineering, AI investing, and AI policy. Coverage for unrelated topics is sparse and noisy.
 - **Short quote excerpts, not transcripts.** Each result is one extracted "key point" from an episode, typically 1-3 sentences. For long-form context, the user will need to listen.
 

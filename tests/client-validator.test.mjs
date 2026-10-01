@@ -128,6 +128,50 @@ describe("isValidSuccessEnvelope — result-row shape checks", () => {
   });
 });
 
+describe("isValidSuccessEnvelope — results[].url", () => {
+  afterEach(restoreFetch);
+  const VALID = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+
+  test("accepts a YouTube watch URL unchanged", async () => {
+    const data = await callSearch(
+      validEnvelope({ total: 1, results: [validResult({ url: VALID })] }),
+    );
+    assert.equal(data.results[0].url, VALID);
+  });
+
+  test("accepts null and absent url (older servers send none)", async () => {
+    const data = await callSearch(
+      validEnvelope({ total: 2, results: [validResult({ url: null }), validResult()] }),
+    );
+    assert.equal(data.results[0].url, null);
+    assert.equal(data.results[1].url, undefined);
+  });
+
+  test("rejects non-string url (structural contract break → exit 3)", async () => {
+    await expectEnvelopeRejected(
+      validEnvelope({ total: 1, results: [validResult({ url: 42 })] }),
+    );
+  });
+
+  const COERCED = [
+    ["javascript:alert(1)", "script scheme"],
+    ["http://www.youtube.com/watch?v=72Im-Mm5JKs", "plain http"],
+    ["https://youtu.be/72Im-Mm5JKs", "short-link host"],
+    ["https://www.youtube.com.evil.example/watch?v=72Im-Mm5JKs", "lookalike host"],
+    ["https://www.youtube.com/watch?v=72Im-Mm5JK", "10-char id"],
+    [`${VALID}&t=42`, "extra query parameter"],
+    ["", "empty string"],
+  ];
+  for (const [input, description] of COERCED) {
+    test(`coerces non-watch-URL string to null: ${description}`, async () => {
+      const data = await callSearch(
+        validEnvelope({ total: 1, results: [validResult({ url: input })] }),
+      );
+      assert.equal(data.results[0].url, null);
+    });
+  }
+});
+
 describe("isValidSuccessEnvelope — published_at calendar validation (R3-01)", () => {
   afterEach(restoreFetch);
 

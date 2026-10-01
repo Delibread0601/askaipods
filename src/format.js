@@ -12,9 +12,9 @@
 // Relevant" sub-views — see SKILL.md.
 
 const ANONYMOUS_NOTE =
-  "Anonymous tier: up to 20 results sorted newest-first, dates fuzzed to month, " +
-  "--days capped at 90 when specified. Set ASKAIPODS_API_KEY for 100 searches/day, full dates, " +
-  "and --days up to 365 (or omit for all-time). Member tier is invite-only — request access at https://podlens.net.";
+  "Anonymous tier: up to 20 results sorted newest-first, --days capped at 90 when specified. " +
+  "Set ASKAIPODS_API_KEY for 100 searches/day and --days up to 365 (or omit for all-time). " +
+  "Member tier is invite-only — request access at https://podlens.net.";
 
 // Sort results newest-first by parsing each `published_at` to a UTC
 // millisecond timestamp and comparing numerically. Pure lexical compare
@@ -24,10 +24,11 @@ const ANONYMOUS_NOTE =
 // newest-first contract for any member-tier response that carries
 // offset timestamps. Numeric UTC compare fixes that.
 //
-// Anonymous tier dates are YYYY-MM (month only); Date.parse is
-// inconsistent across engines for that shape, so normalize to
-// YYYY-MM-01 first. Member tier dates are always Date.parse-able
-// (either YYYY-MM-DD or a full ISO 8601 timestamp with offset).
+// Both tiers now return full dates (YYYY-MM-DD or a full ISO 8601
+// timestamp with offset). Older servers sent month-only YYYY-MM dates
+// for the anonymous tier, and the validator still accepts that shape;
+// Date.parse is inconsistent across engines for it, so normalize to
+// YYYY-MM-01 first.
 //
 // Nulls and any unparseable value sort to the end so absent-date
 // results don't crowd out the dated ones.
@@ -84,6 +85,10 @@ export function toStructured(query, response) {
       podcast: r.podcast_name ?? null,
       episode: r.episode_title ?? null,
       date: r.published_at ?? null,
+      // YouTube watch URL for the episode (start of the video, not the
+      // quote's timestamp); null when the server has none. client.js
+      // already nulled anything outside the watch-URL shape.
+      url: r.url ?? null,
       text: r.text ?? "",
       api_rank: r.api_rank,
     })),
@@ -245,7 +250,9 @@ export function renderMarkdown(query, response) {
     const podcast = r.podcast ?? "Unknown podcast";
     const date = r.date ?? "date unknown";
     lines.push(`### ${i + 1}. ${podcast} — ${title}`);
-    lines.push(`*${date}*`);
+    // Bare URL rather than a [label](url) link: terminals and GFM
+    // both auto-link it, while link syntax prints raw in a terminal.
+    lines.push(r.url ? `*${date}* · ${r.url}` : `*${date}*`);
     lines.push("");
     // Quote-block the text and collapse newlines so the markdown stays compact.
     const text = (r.text ?? "").replace(/\s+/g, " ").trim();

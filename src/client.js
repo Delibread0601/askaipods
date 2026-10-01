@@ -77,6 +77,11 @@ function isValidPublishedAt(v) {
   return true;
 }
 
+// Episode source link shape. Mirrors the server's own whitelist
+// (podlens-site functions/lib/pure.ts::youtubeWatchUrl): https, the
+// www.youtube.com watch path, and an 11-char video id — nothing else.
+const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/;
+
 // Validate the PodLens success envelope against the documented contract.
 // Any mismatch is treated as a protocol break and surfaces as exit 3 —
 // better a loud AskaipodsError(exitCode=3) than a TypeError escaping as
@@ -91,6 +96,9 @@ function isValidPublishedAt(v) {
 //   data.results[i].episode_title  : string or null/undefined
 //   data.results[i].podcast_name   : string or null/undefined
 //   data.results[i].published_at   : string or null/undefined
+//   data.results[i].url        : string or null/undefined; a string that
+//                                is not a YouTube watch URL is coerced
+//                                to null in place (see YOUTUBE_WATCH_URL)
 //   data.meta                  : non-array object
 //   data.meta.tier             : closed enum {"anonymous","member"}
 //   data.meta.quota            : non-array object
@@ -130,6 +138,15 @@ function isValidSuccessEnvelope(data) {
     if (item.episode_title != null && typeof item.episode_title !== "string") return false;
     if (item.podcast_name != null && typeof item.podcast_name !== "string") return false;
     if (!isValidPublishedAt(item.published_at)) return false;
+    // url follows the same structural/content split as
+    // corpus_freshness.newest_date below: a non-string is a contract
+    // break (exit 3), while a string outside the server's YouTube
+    // watch-URL shape is coerced to null so a host agent never renders
+    // an arbitrary link as an episode source.
+    if (item.url != null) {
+      if (typeof item.url !== "string") return false;
+      if (!YOUTUBE_WATCH_URL.test(item.url)) item.url = null;
+    }
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
@@ -243,7 +260,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.2.7 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.2.8 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;

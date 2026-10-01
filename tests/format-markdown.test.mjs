@@ -175,6 +175,11 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.match(out, /podlens\.net/);
   });
 
+  test("anonymous note no longer claims month-fuzzed dates", () => {
+    const out = renderMarkdown("q", empty());
+    assert.doesNotMatch(out, /fuzzed|full dates/);
+  });
+
   test("member empty result does NOT append ANONYMOUS_NOTE", () => {
     const env = validEnvelope({
       meta: { tier: "member", quota: { used: 5, limit: 100 } },
@@ -247,6 +252,20 @@ describe("renderMarkdown — result rendering", () => {
     const out = renderMarkdown("q", env);
     assert.match(out, /Unknown podcast — Untitled episode/);
     assert.match(out, /date unknown/);
+  });
+
+  test("url renders as a bare link after the date; null url → date only", () => {
+    const url = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+    const env = validEnvelope({
+      total: 2,
+      results: [
+        validResult({ published_at: "2026-09-23", url, text: "WITH" }),
+        validResult({ published_at: "2026-09-01", url: null, text: "WITHOUT" }),
+      ],
+    });
+    const lines = renderMarkdown("q", env).split("\n");
+    assert.ok(lines.includes(`*2026-09-23* · ${url}`));
+    assert.ok(lines.includes("*2026-09-01*"));
   });
 
   test("result text with internal newlines is collapsed to single spaces", () => {

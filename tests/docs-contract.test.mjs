@@ -108,3 +108,12 @@ describe("R7-01 — SKILL.md argv-safety rule present", () => {
     assert.match(body, /"--"/, "SKILL.md must document the `--` positional separator");
   });
 });
+
+describe("v0.2.8 — full dates + episode url documented in SKILL.md", () => {
+  test("SKILL.md documents results[].url, renders it, and drops the month-fuzz claim", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /\*\*`results\[\]\.url`\*\*/, "field note for results[].url");
+    assert.match(body, /\[YouTube\]\(<url>\)/, "render templates carry the YouTube link");
+    assert.doesNotMatch(body, /fuzzed|date_precision|month-precision/);
+  });
+});

@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.2.7";
+const VERSION = "0.2.8";
 
 const HELP_TEXT = `askaipods ${VERSION} — search AI podcast quotes by topic
 

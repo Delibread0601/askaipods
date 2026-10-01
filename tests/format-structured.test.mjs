@@ -32,7 +32,7 @@ describe("sortByDateDesc — pure function", () => {
     assert.equal(dates[3], null);
   });
 
-  test("anonymous tier YYYY-MM normalizes to YYYY-MM-01 before compare", () => {
+  test("legacy month-only YYYY-MM (pre-full-date servers) normalizes to YYYY-MM-01 before compare", () => {
     const sorted = sortByDateDesc([
       { published_at: "2025-01" },
       { published_at: "2025-12" },
@@ -163,6 +163,22 @@ describe("toStructured — field mapping + defaults", () => {
     assert.equal(s.results[0].episode, null);
     assert.equal(s.results[0].podcast, null);
     assert.equal(s.results[0].date, null);
+    assert.equal(s.results[0].url, null, "absent url → null");
+  });
+
+  test("url passes through, placed between date and text", () => {
+    const url = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+    const env = validEnvelope({
+      total: 2,
+      results: [
+        validResult({ published_at: "2026-09-23", url }),
+        validResult({ published_at: "2026-09-01", url: null }),
+      ],
+    });
+    const s = toStructured("q", env);
+    assert.equal(s.results[0].url, url);
+    assert.equal(s.results[1].url, null);
+    assert.deepEqual(Object.keys(s.results[0]), ["podcast", "episode", "date", "url", "text", "api_rank"]);
   });
 });
 
