@@ -358,7 +358,7 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.3.0 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.3.1 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
