@@ -41,7 +41,7 @@ Web search is bad at "what is the AI community thinking about X right now". You 
 npx askaipods "your query here"
 ```
 
-That's the entire install. `npx` fetches the package on first use and reuses its cache afterwards — run `npx askaipods@latest "…"` to force the newest release. No global install needed.
+That's the entire install. `npx` checks the registry and runs the latest published version each time — unless askaipods is also installed in the current project or globally, in which case that copy runs (update it with `npm install -g askaipods@latest`). No global install needed.
 
 To install globally (faster startup):
 
