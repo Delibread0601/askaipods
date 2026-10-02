@@ -16,8 +16,8 @@ This rule applies to the GitHub release body only — not to git commit messages
    - `package.json` `"version"`
    - `src/cli.js` `const VERSION = "..."`
    - `src/client.js` `User-Agent` header string
-2. **Commit and push to `main`.** The `.github/workflows/auto-tag.yml` workflow watches `package.json` changes on `main`; when the version field changes and the tag does not already exist, it creates and pushes the `vX.Y.Z` tag. It does **not** create a GitHub release.
-3. **Create the GitHub release manually** with `gh release create vX.Y.Z --title "vX.Y.Z — <short descriptor>" --notes "$(cat <<'EOF' ... EOF)"`, following the §Release notes style rule above. Use `gh release edit` to amend; do not delete-and-recreate (URLs break, subscribers re-notified).
+2. **Commit and push to `main`.** The `.github/workflows/auto-tag.yml` workflow watches `package.json` changes on `main`; when the version field changes and the tag does not already exist, it creates and pushes the `vX.Y.Z` tag. Whenever the version changes and no release exists for that tag yet, it also publishes a placeholder GitHub release (title = tag, auto-generated notes) so the "Latest" release never lags the newest tag.
+3. **Replace the placeholder release notes** with `gh release edit vX.Y.Z --title "vX.Y.Z — <short descriptor>" --notes "$(cat <<'EOF' ... EOF)"`, following the §Release notes style rule above. If the workflow failed to create the release, use `gh release create` with the same arguments instead. Do not delete-and-recreate (URLs break, subscribers re-notified).
 4. **Publish to npm** (`npm publish`) if the release is a source change — skip npm publish for release-note-only corrections. Authenticate interactively (`npm login --auth-type=web`) and complete the 2FA prompt on publish; do not store a long-lived publish token in `~/.npmrc` — npm is removing direct-publish rights from 2FA-bypass granular tokens (January 2027). The 2FA step needs the user, so Claude hands this command to the user rather than running it.
 
 ## Zero-dependency constraint
