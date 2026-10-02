@@ -1,5 +1,6 @@
 // Tests for format.js: toStructured passthrough, sortByDateDesc UTC
-// comparison, and the tier → render_hint contract.
+// comparison, and the tier / sort → render_hint contract on old and
+// three-tier servers.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -85,7 +86,7 @@ describe("sortByDateDesc — pure function", () => {
   });
 });
 
-describe("toStructured — render_hint + tier", () => {
+describe("toStructured — render_hint + tier (old server: no access_tier / sort)", () => {
   test("member tier → render_hint 'dual_view'", () => {
     const env = validEnvelope({
       meta: { tier: "member", quota: { used: 5, limit: 100 } },
@@ -93,12 +94,76 @@ describe("toStructured — render_hint + tier", () => {
     const s = toStructured("q", env);
     assert.equal(s.tier, "member");
     assert.equal(s.render_hint, "dual_view");
+    assert.equal(s.sort, null);
+    assert.equal(s.downgraded, null);
   });
 
   test("anonymous tier → render_hint 'single_view'", () => {
     const s = toStructured("q", validEnvelope());
     assert.equal(s.tier, "anonymous");
     assert.equal(s.render_hint, "single_view");
+    assert.equal(s.sort, null);
+    assert.equal(s.downgraded, null);
+  });
+});
+
+describe("toStructured — three-tier server (access_tier / sort / downgraded)", () => {
+  const env = (meta) =>
+    validEnvelope({ meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, ...meta } });
+
+  test("tier = meta.access_tier, not the frozen meta.tier", () => {
+    const s = toStructured(
+      "q",
+      env({ access_tier: "free", quota: { used: 1, limit: 50 }, sort: { requested: "recency", served: "recency" } }),
+    );
+    assert.equal(s.tier, "free");
+  });
+
+  test("sort passes through; served relevance → dual_view", () => {
+    const sort = { requested: "relevance", served: "relevance" };
+    const s = toStructured("q", env({ tier: "member", access_tier: "member", sort }));
+    assert.deepEqual(s.sort, sort);
+    assert.equal(s.render_hint, "dual_view");
+  });
+
+  test("member served recency → single_view (render_hint follows sort, not tier)", () => {
+    const s = toStructured(
+      "q",
+      env({ tier: "member", access_tier: "member", sort: { requested: "recency", served: "recency" } }),
+    );
+    assert.equal(s.tier, "member");
+    assert.equal(s.render_hint, "single_view");
+  });
+
+  test("free asking relevance is served recency → single_view, mismatch visible in sort", () => {
+    const s = toStructured(
+      "q",
+      env({ access_tier: "free", sort: { requested: "relevance", served: "recency" } }),
+    );
+    assert.equal(s.render_hint, "single_view");
+    assert.equal(s.sort.requested, "relevance");
+    assert.equal(s.sort.served, "recency");
+  });
+
+  test("downgraded passes through; absent → null", () => {
+    const downgraded = {
+      from: "free",
+      reason: "free_pool_exhausted",
+      waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
+    };
+    const s = toStructured(
+      "q",
+      env({ access_tier: "anonymous", sort: { requested: "recency", served: "recency" }, downgraded }),
+    );
+    assert.deepEqual(s.downgraded, downgraded);
+    assert.equal(s.tier, "anonymous");
+    assert.equal(toStructured("q", env({ access_tier: "anonymous" })).downgraded, null);
+  });
+
+  test("top-level key order: tier, query, fetched_at, render_hint, sort, downgraded, results, meta", () => {
+    assert.deepEqual(Object.keys(toStructured("q", env({}))), [
+      "tier", "query", "fetched_at", "render_hint", "sort", "downgraded", "results", "meta",
+    ]);
   });
 });
 

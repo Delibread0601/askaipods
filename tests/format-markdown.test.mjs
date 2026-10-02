@@ -6,7 +6,8 @@
 //           (validator test; here we check the downstream render only
 //           receives validated shapes)
 //   R6-01 — unknown warning code falls back with forward-compat copy
-//   Plus: refunded tag, anonymous footer, 3-column result header.
+//   Plus: refunded tag, per-tier closing note, header (tier / sort /
+//   results / quota), degrade notice.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -165,14 +166,13 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.match(out, /Try a different phrasing or broader topic\./);
   });
 
-  test("anonymous empty result appends ANONYMOUS_NOTE footer", () => {
+  test("anonymous empty result appends the anonymous tier note (free sign-in path)", () => {
     const out = renderMarkdown("q", empty());
-    // Pre-existing invariant: anonymous note mentions invite-only AND
-    // sign-up path.
     assert.match(out, /Anonymous tier/);
-    assert.match(out, /invite-only/);
+    assert.match(out, /Sign in free with Google or GitHub at https:\/\/podlens\.net/);
     assert.match(out, /ASKAIPODS_API_KEY/);
-    assert.match(out, /podlens\.net/);
+    assert.match(out, /50 searches\/day/);
+    assert.doesNotMatch(out, /invite/i);
   });
 
   test("anonymous note no longer claims month-fuzzed dates", () => {
@@ -180,19 +180,106 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.doesNotMatch(out, /fuzzed|full dates/);
   });
 
-  test("anonymous note states the bounded default (omitted --days = the cap)", () => {
+  test("anonymous note states the bounded default (omitted --days = the cap), 30 without restrictions", () => {
     const out = renderMarkdown("q", empty());
-    assert.match(out, /--days capped at 90 \(omitted = 90\)/);
-    assert.match(out, /--days up to 365 \(omitted = 365\)/);
+    assert.match(out, /--days capped at 30 \(omitted = 30\)/);
+    assert.match(out, /--days up to 90/);
     assert.doesNotMatch(out, /all-time/);
   });
 
-  test("member empty result does NOT append ANONYMOUS_NOTE", () => {
+  test("anonymous note follows the server's restrictions.max_days (old server: 90)", () => {
+    const out = renderMarkdown("q", empty({ restrictions: { max_results: 20, max_days: 90 } }));
+    assert.match(out, /--days capped at 90 \(omitted = 90\)/);
+  });
+
+  test("member empty result appends no tier note", () => {
     const env = validEnvelope({
       meta: { tier: "member", quota: { used: 5, limit: 100 } },
     });
     const out = renderMarkdown("q", env);
-    assert.doesNotMatch(out, /Anonymous tier/);
+    assert.doesNotMatch(out, /Anonymous tier|Free tier|waitlist/);
+  });
+
+  test("step 1 copy names the tier cap from restrictions.max_days, no fixed tier list", () => {
+    const out = renderMarkdown(
+      "q",
+      empty({ warning: { code: "corpus_stale_for_requested_window" }, restrictions: { max_days: 30 } }),
+    );
+    assert.match(out, /up to your tier cap \(30 days\)/);
+    assert.doesNotMatch(out, /90 anonymous|365 member/);
+  });
+});
+
+describe("renderMarkdown — three-tier server (0.3.0)", () => {
+  const meta3 = (extra) => ({
+    tier: "anonymous",
+    quota: { used: 1, limit: 20 },
+    sort: { requested: "recency", served: "recency" },
+    ...extra,
+  });
+
+  test("header shows the effective tier (access_tier) and the served ordering", () => {
+    const out = renderMarkdown("q", nonEmpty(meta3({ access_tier: "free", quota: { used: 2, limit: 50 } })));
+    assert.match(out, /\*Tier: free · Sort: recency · Results: 1 · Quota: 2\/50 daily\*/);
+  });
+
+  test("header flags a relevance request served as recency", () => {
+    const out = renderMarkdown(
+      "q",
+      nonEmpty(meta3({ access_tier: "free", sort: { requested: "relevance", served: "recency" } })),
+    );
+    assert.match(out, /Sort: recency \(relevance requested — member-only\)/);
+  });
+
+  test("member served relevance: header says relevance, no tier note", () => {
+    const out = renderMarkdown(
+      "q",
+      nonEmpty(meta3({ tier: "member", access_tier: "member", quota: { used: 3, limit: 100 }, sort: { requested: "relevance", served: "relevance" } })),
+    );
+    assert.match(out, /Tier: member · Sort: relevance ·/);
+    assert.doesNotMatch(out, /Anonymous tier|Free tier/);
+  });
+
+  test("old server (no sort) → header has no Sort label", () => {
+    const out = renderMarkdown("q", nonEmpty());
+    assert.doesNotMatch(out, /Sort:/);
+  });
+
+  test("free tier note: cap 90 + paid-membership waitlist from meta.cta.waitlist, no approval promise", () => {
+    // Distinct from the built-in fallback URL, so the assertion proves the
+    // server-provided link won.
+    const waitlist = "https://podlens.net/dashboard?source=server_cta#waitlist";
+    const out = renderMarkdown(
+      "q",
+      nonEmpty(meta3({ access_tier: "free", quota: { used: 2, limit: 50 }, restrictions: { max_days: 90 }, cta: { waitlist } })),
+    );
+    assert.match(out, /Free tier: up to 20 results sorted newest-first, --days capped at 90 \(omitted = 90\)/);
+    assert.ok(out.includes(waitlist), "uses meta.cta.waitlist");
+    assert.doesNotMatch(out, /source=askaipods/, "fallback not used");
+    assert.match(out, /does not grant membership/);
+    assert.doesNotMatch(out, /Anonymous tier|Sign in free|invite|approv/i);
+  });
+
+  test("free tier note falls back to the dashboard waitlist URL when cta has none", () => {
+    const out = renderMarkdown("q", nonEmpty(meta3({ access_tier: "free" })));
+    assert.match(out, /https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/);
+  });
+
+  test("degraded request: degrade notice with the server's waitlist link, no sign-in tier note", () => {
+    const waitlist = "https://podlens.net/dashboard?source=quota_exhausted#waitlist";
+    const env = nonEmpty(
+      meta3({
+        access_tier: "anonymous",
+        restrictions: { max_days: 30 },
+        downgraded: { from: "free", reason: "free_pool_exhausted", waitlist },
+      }),
+    );
+    for (const out of [renderMarkdown("q", env), renderMarkdown("q", empty(env.meta))]) {
+      assert.match(out, /Today's free-tier capacity is used up, so this search ran at the anonymous level \(--days cap 30, 20 searches\/day per IP\)/);
+      assert.ok(out.includes(waitlist));
+      assert.match(out, /does not grant membership/);
+      assert.doesNotMatch(out, /Anonymous tier|Sign in free/);
+    }
   });
 });
 

@@ -653,3 +653,87 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     );
   });
 });
+
+describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sort / downgraded)", () => {
+  afterEach(restoreFetch);
+
+  const meta = (extra) => ({ tier: "anonymous", quota: { used: 1, limit: 20 }, ...extra });
+
+  test("old server shape (no access_tier / sort / downgraded) still accepted", async () => {
+    const data = await callSearch(validEnvelope());
+    assert.equal(data.meta.access_tier, undefined);
+    assert.equal(data.meta.sort, undefined);
+  });
+
+  for (const access_tier of ["anonymous", "free", "member"]) {
+    test(`accepts access_tier "${access_tier}"`, async () => {
+      const tier = access_tier === "member" ? "member" : "anonymous";
+      const data = await callSearch(validEnvelope({ meta: meta({ tier, access_tier }) }));
+      assert.equal(data.meta.access_tier, access_tier);
+    });
+  }
+
+  test("accepts null access_tier (treated as absent)", async () => {
+    await callSearch(validEnvelope({ meta: meta({ access_tier: null }) }));
+  });
+
+  for (const [bad, description] of [
+    ["premium", "unknown string"],
+    ["Free", "wrong case"],
+    [1, "number"],
+    [{}, "object"],
+  ]) {
+    test(`rejects access_tier: ${description}`, async () => {
+      await expectEnvelopeRejected(validEnvelope({ meta: meta({ access_tier: bad }) }));
+    });
+  }
+
+  test("meta.tier stays the closed two-value enum — 'free' there is rejected", async () => {
+    await expectEnvelopeRejected(validEnvelope({ meta: meta({ tier: "free", access_tier: "free" }) }));
+  });
+
+  test("accepts sort with enum values (incl. a relevance→recency downgrade)", async () => {
+    for (const sort of [
+      { requested: "recency", served: "recency" },
+      { requested: "relevance", served: "relevance" },
+      { requested: "relevance", served: "recency" },
+    ]) {
+      const data = await callSearch(validEnvelope({ meta: meta({ sort }) }));
+      assert.deepEqual(data.meta.sort, sort);
+    }
+  });
+
+  for (const [bad, description] of [
+    ["recency", "string instead of object"],
+    [{ requested: "recency" }, "missing served"],
+    [{ served: "recency" }, "missing requested"],
+    [{ requested: "recency", served: "similarity" }, "unknown served value"],
+    [{ requested: "newest", served: "recency" }, "unknown requested value"],
+    [[], "array"],
+  ]) {
+    test(`rejects sort: ${description}`, async () => {
+      await expectEnvelopeRejected(validEnvelope({ meta: meta({ sort: bad }) }));
+    });
+  }
+
+  test("accepts downgraded {from, reason, waitlist}", async () => {
+    const downgraded = {
+      from: "free",
+      reason: "free_pool_exhausted",
+      waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
+    };
+    const data = await callSearch(validEnvelope({ meta: meta({ access_tier: "anonymous", downgraded }) }));
+    assert.deepEqual(data.meta.downgraded, downgraded);
+  });
+
+  for (const [bad, description] of [
+    ["free", "string instead of object"],
+    [{ from: "free", reason: "free_pool_exhausted" }, "missing waitlist"],
+    [{ from: 1, reason: "free_pool_exhausted", waitlist: "https://podlens.net/" }, "non-string from"],
+    [{ from: "free", reason: null, waitlist: "https://podlens.net/" }, "null reason"],
+  ]) {
+    test(`rejects downgraded: ${description}`, async () => {
+      await expectEnvelopeRejected(validEnvelope({ meta: meta({ downgraded: bad }) }));
+    });
+  }
+});

@@ -11,10 +11,41 @@
 // agent's job is to optionally split that into "Latest" and "Top
 // Relevant" sub-views — see SKILL.md.
 
-const ANONYMOUS_NOTE =
-  "Anonymous tier: up to 20 results sorted newest-first, --days capped at 90 (omitted = 90). " +
-  "Set ASKAIPODS_API_KEY for 100 searches/day and --days up to 365 (omitted = 365). " +
-  "Member tier is invite-only — request access at https://podlens.net.";
+const WAITLIST_URL = "https://podlens.net/dashboard?source=askaipods#waitlist";
+
+// The tier's --days cap as the server reported it (meta.restrictions
+// .max_days), so the copy stays right on servers with different caps.
+// Falls back to the given default when the field is absent or malformed
+// (restrictions is passthrough, not validated).
+function capDays(data, fallback) {
+  const d = data.meta.restrictions?.max_days;
+  return Number.isSafeInteger(d) && d > 0 ? d : fallback;
+}
+
+// Closing note for the non-member tiers: the cap, and the next step up.
+// Members get none. A degraded request gets the degrade notice instead —
+// the caller is already signed in, so "sign in free" would be wrong.
+function tierNote(data) {
+  if (data.downgraded) return null;
+  if (data.tier === "anonymous") {
+    const cap = capDays(data, 30);
+    return (
+      `Anonymous tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
+      "Sign in free with Google or GitHub at https://podlens.net and set ASKAIPODS_API_KEY to the account's " +
+      "API key for 50 searches/day and --days up to 90."
+    );
+  }
+  if (data.tier === "free") {
+    const cap = capDays(data, 90);
+    const waitlist = typeof data.meta.cta?.waitlist === "string" ? data.meta.cta.waitlist : WAITLIST_URL;
+    return (
+      `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
+      "Relevance ordering, --days up to 365 and 100 searches/day come with paid membership — " +
+      `waitlist: ${waitlist} (joining records interest; it does not grant membership).`
+    );
+  }
+  return null;
+}
 
 // Seconds → "m:ss" / "h:mm:ss" for the approximate-timestamp label.
 export function clock(seconds) {
@@ -58,11 +89,15 @@ export function sortByDateDesc(items) {
 }
 
 // Build the structured payload an agent will parse. Each result keeps
-// its `api_rank` (1 = most semantically relevant in API order) so the
-// SKILL.md can tell the agent to derive a "Top Relevant" sub-view for
-// member tier without re-querying. For anonymous tier api_rank reflects
-// temporal order (newest-first from the API), not semantic relevance —
-// `render_hint` flags that distinction.
+// its `api_rank` (its position in API order) so the SKILL.md can tell
+// the agent to derive a "Top Relevant" sub-view without re-querying when
+// the server selected by relevance. When it selected by recency,
+// api_rank reflects temporal order (newest-first from the API), not
+// semantic relevance — `render_hint` flags that distinction:
+//   - `meta.sort` present (current server): dual_view iff
+//     sort.served === "relevance";
+//   - `meta.sort` absent (server that predates it): member results were
+//     always relevance-selected, anonymous ones recency-selected.
 //
 // Preconditions: `response` must be a validated success envelope from
 // `client.search()`. `client.js` validates `meta.tier` is a non-empty
@@ -78,17 +113,33 @@ export function toStructured(query, response) {
   // Read them directly. The remaining fields below (total,
   // meta.query_hash, meta.restrictions) are optional per the server
   // contract and keep their `?? null` / fallback defenses.
-  const tier = response.meta.tier;
+  //
+  // `tier` is the effective tier: `meta.access_tier` (anonymous / free /
+  // member) when the server sends it, else the legacy two-value
+  // `meta.tier`.
+  const tier = response.meta.access_tier ?? response.meta.tier;
+  const sort = response.meta.sort ?? null;
   const apiResults = response.results;
 
   const withRank = apiResults.map((r, idx) => ({ ...r, api_rank: idx + 1 }));
   const sorted = sortByDateDesc(withRank);
 
+  let renderHint;
+  if (sort) renderHint = sort.served === "relevance" ? "dual_view" : "single_view";
+  else renderHint = response.meta.tier === "member" ? "dual_view" : "single_view";
+
   return {
     tier,
     query,
     fetched_at: new Date().toISOString(),
-    render_hint: tier === "member" ? "dual_view" : "single_view",
+    render_hint: renderHint,
+    // { requested, served } — the ordering asked for and the one the
+    // server ran (relevance is member-only); null on servers that
+    // predate the field.
+    sort,
+    // { from, reason, waitlist } when a free request ran at the anonymous
+    // level because today's free-tier capacity was used up; else null.
+    downgraded: response.meta.downgraded ?? null,
     results: sorted.map((r) => ({
       podcast: r.podcast_name ?? null,
       episode: r.episode_title ?? null,
@@ -118,8 +169,9 @@ export function toStructured(query, response) {
       //                        issue rather than a semantic mismatch.
       //   corpus_freshness   — { newest_date: "YYYY-MM-DD" | null };
       //                        lets the agent render "data as of X".
-      //   cta                — anonymous-tier call-to-action (e.g.
-      //                        follow URL) passed through unchanged.
+      //   cta                — non-member call-to-action (anonymous:
+      //                        follow URL; free: paid-membership
+      //                        waitlist URL) passed through unchanged.
       // All three are optional — defaulted to null so the structured
       // output shape is stable across server versions.
       warning: response.meta.warning ?? null,
@@ -147,12 +199,32 @@ export function renderMarkdown(query, response) {
     : "unknown";
   // Server's P1-b narrow refund: when corpus is stale AND delivered
   // results are empty, the quota slot is refunded (see server CLAUDE.md
-  // §Two-Tier Search Access). Surface as a trailing tag so the user
+  // §Three-Tier Search Access). Surface as a trailing tag so the user
   // knows the search was free — `quota.used` is already decremented
   // upstream, so we only need the marker, not a separate count.
   const refundedTag = data.meta.quota?.refunded ? " · refunded" : "";
-  lines.push(`*Tier: ${tierLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
+  // Served ordering, when the server reports it. A mismatch means the
+  // requested ordering is not available on this tier (relevance is
+  // member-only).
+  let sortLabel = "";
+  if (data.sort) {
+    const { requested, served } = data.sort;
+    sortLabel = requested === served ? ` · Sort: ${served}` : ` · Sort: ${served} (${requested} requested — member-only)`;
+  }
+  lines.push(`*Tier: ${tierLabel}${sortLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
   lines.push("");
+
+  // Degrade notice: a free request ran at the anonymous level because
+  // today's free-tier capacity was used up. Shown before every other
+  // note — it explains the tier, cap and quota in the header.
+  if (data.downgraded) {
+    lines.push(
+      `*Note: Today's ${data.downgraded.from}-tier capacity is used up, so this search ran at the anonymous level ` +
+        `(--days cap ${capDays(data, 30)}, 20 searches/day per IP). Paid-membership waitlist: ${data.downgraded.waitlist} ` +
+        "(joining records interest; it does not grant membership).*",
+    );
+    lines.push("");
+  }
 
   if (data.results.length === 0) {
     const win = data.meta.window;
@@ -175,8 +247,10 @@ export function renderMarkdown(query, response) {
     // actionable than the expanded copy ("rephrase").
     if (warningCode === "corpus_stale_for_requested_window") {
       const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
+      const cap = capDays(data, null);
+      const capText = cap ? ` (${cap} days)` : "";
       lines.push(
-        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — a longer \`--days\` helps only up to your tier cap (90 anonymous / 365 member); omitting \`--days\` already searches the cap.`,
+        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — a longer \`--days\` helps only up to your tier cap${capText}; omitting \`--days\` already searches the cap.`,
       );
     } else if (warningCode === "index_metadata_stale") {
       lines.push(
@@ -207,9 +281,10 @@ export function renderMarkdown(query, response) {
     } else {
       lines.push("No results found. Try a different phrasing or broader topic.");
     }
-    if (data.tier === "anonymous") {
+    const note = tierNote(data);
+    if (note) {
       lines.push("");
-      lines.push(`> ${ANONYMOUS_NOTE}`);
+      lines.push(`> ${note}`);
     }
     return lines.join("\n");
   }
@@ -281,9 +356,10 @@ export function renderMarkdown(query, response) {
     lines.push("");
   }
 
-  if (data.tier === "anonymous") {
+  const note = tierNote(data);
+  if (note) {
     lines.push("---");
-    lines.push(`*${ANONYMOUS_NOTE}*`);
+    lines.push(`*${note}*`);
   }
 
   return lines.join("\n");

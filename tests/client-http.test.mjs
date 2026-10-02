@@ -1,4 +1,5 @@
-// Tests for client.js status → exit-code mapping, 429 tier-aware message,
+// Tests for client.js status → exit-code mapping, 429 tier-aware message
+// (old and new server shapes),
 // and the R7-02 / R8-01 timeout / body-read distinction.
 
 import { test, describe, afterEach } from "node:test";
@@ -54,6 +55,15 @@ describe("search — happy path", () => {
     assert.equal(init.headers["X-PodLens-API-Key"], "k1");
     assert.equal(init.headers["Content-Type"], "application/json");
     assert.match(init.headers["User-Agent"], /^askaipods\//);
+  });
+
+  test("sends sort in body; defaults to 'recency' when unset", async () => {
+    const calls = mockResponse({ body: validEnvelope() });
+    await search({ query: "hi", sort: "relevance", endpoint: "https://mock/" });
+    assert.equal(JSON.parse(calls[0].init.body).sort, "relevance");
+    const calls2 = mockResponse({ body: validEnvelope() });
+    await search({ query: "hi", endpoint: "https://mock/" });
+    assert.equal(JSON.parse(calls2[0].init.body).sort, "recency");
   });
 
   test("omits days from body when not > 0", async () => {
@@ -195,21 +205,24 @@ describe("search — HTTP error → exit-code mapping", () => {
 describe("search — 429 tier-aware quota messaging", () => {
   afterEach(restoreFetch);
 
-  test("429 with 'quota' in message, no apiKey → exit 2, anonymous message", async () => {
+  // Older server shape: no meta.access_tier / meta.downgraded on the 429
+  // envelope, so the X-RateLimit-Limit header (or, without it, whether a
+  // key was sent) decides the copy.
+  test("old server: 429 quota, no apiKey → exit 2, anonymous message with the free sign-in path", async () => {
     mockResponse({
       status: 429,
       body: { error: "daily quota exhausted for anonymous tier" },
     });
     const err = await runAndCatch();
     assert.equal(err.exitCode, 2);
-    // Invariant: anonymous quota-exhausted message mentions invite-only
-    // AND ASKAIPODS_API_KEY sign-up path.
-    assert.match(err.message, /invite-only/i);
+    assert.match(err.message, /anonymous tier: 20\/day per IP/);
+    assert.match(err.message, /sign in free with Google or GitHub at https:\/\/podlens\.net/);
+    assert.match(err.message, /50 searches\/day/);
     assert.match(err.message, /ASKAIPODS_API_KEY/);
-    assert.match(err.message, /20\/day/);
+    assert.doesNotMatch(err.message, /invite/i);
   });
 
-  test("429 with 'quota' in message, WITH apiKey → exit 2, member message omits sign-up path", async () => {
+  test("old server: 429 quota WITH apiKey and no header → member message, no sign-in path", async () => {
     mockResponse({
       status: 429,
       body: { error: "daily quota exhausted for member tier" },
@@ -217,12 +230,12 @@ describe("search — 429 tier-aware quota messaging", () => {
     const err = await runAndCatch({ apiKey: "k1" });
     assert.equal(err.exitCode, 2);
     assert.match(err.message, /member tier: 100\/day/i);
-    // Member tier must NOT be told to "set ASKAIPODS_API_KEY" — they already have one.
-    assert.doesNotMatch(err.message, /set ASKAIPODS_API_KEY/);
-    assert.doesNotMatch(err.message, /invite-only/);
+    // Member tier must NOT be told to sign in or set a key — they already have one.
+    assert.doesNotMatch(err.message, /ASKAIPODS_API_KEY|sign in|waitlist/i);
+    assert.doesNotMatch(err.message, /invite/i);
   });
 
-  test("429 quota with a key served as anonymous (X-RateLimit-Limit 20) → anonymous message naming the key", async () => {
+  test("old server: 429 quota with a key served as anonymous (X-RateLimit-Limit 20) → anonymous message naming the key", async () => {
     mockResponse({
       status: 429,
       body: { error: "Daily search quota exhausted" },
@@ -230,11 +243,12 @@ describe("search — 429 tier-aware quota messaging", () => {
     });
     const err = await runAndCatch({ apiKey: "k1" });
     assert.equal(err.exitCode, 2);
-    assert.match(err.message, /anonymous tier: 20\/day — this API key is not a member-tier key/);
+    assert.match(err.message, /anonymous tier: 20\/day per IP — this API key was served as anonymous/);
     assert.doesNotMatch(err.message, /member tier: 100\/day/);
+    assert.doesNotMatch(err.message, /invite/i);
   });
 
-  test("429 quota with X-RateLimit-Limit 100 → member message", async () => {
+  test("old server: 429 quota with X-RateLimit-Limit 100 → member message", async () => {
     mockResponse({
       status: 429,
       body: { error: "Daily search quota exhausted" },
@@ -242,6 +256,87 @@ describe("search — 429 tier-aware quota messaging", () => {
     });
     const err = await runAndCatch({ apiKey: "k1" });
     assert.match(err.message, /member tier: 100\/day/);
+  });
+
+  test("429 quota with X-RateLimit-Limit 50 and no access_tier → free message", async () => {
+    mockResponse({
+      status: 429,
+      body: { error: "Daily search quota exhausted" },
+      headers: { "x-ratelimit-limit": "50" },
+    });
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.match(err.message, /free tier: 50\/day/);
+  });
+
+  // New server shape: the 429 envelope's meta carries access_tier (and
+  // downgraded for a degraded free request), which wins over the header.
+  function newServer429(meta, limit) {
+    return {
+      status: 429,
+      body: { error: "Daily search quota exhausted", meta },
+      headers: { "x-ratelimit-limit": String(limit) },
+    };
+  }
+
+  test("new server: access_tier anonymous, no key → anonymous message with the free sign-in path", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /anonymous tier: 20\/day per IP\)/);
+    assert.match(err.message, /sign in free with Google or GitHub at https:\/\/podlens\.net/);
+    assert.match(err.message, /50 searches\/day/);
+  });
+
+  test("new server: access_tier free → 50/day + waitlist link, no approval promise, frozen tier ignored", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "free", quota: { used: 50, limit: 50 } }, 50));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /free tier: 50\/day/);
+    assert.match(err.message, /https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/);
+    assert.match(err.message, /does not grant membership/);
+    assert.doesNotMatch(err.message, /anonymous tier|invite|approv/i);
+  });
+
+  test("new server: access_tier member → member message", async () => {
+    mockResponse(newServer429({ tier: "member", access_tier: "member", quota: { used: 100, limit: 100 } }, 100));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.match(err.message, /member tier: 100\/day/);
+    assert.doesNotMatch(err.message, /waitlist|sign in/i);
+  });
+
+  test("new server: access_tier wins over a contradicting X-RateLimit-Limit header", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "free", quota: { used: 50, limit: 50 } }, 100));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.match(err.message, /free tier: 50\/day/);
+  });
+
+  test("new server: unknown access_tier falls back to the header rule", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "gold", quota: { used: 20, limit: 20 } }, 20));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.match(err.message, /this API key was served as anonymous/);
+  });
+
+  test("new server: degraded free request (meta.downgraded) → degrade copy with the server's waitlist link", async () => {
+    const waitlist = "https://podlens.net/dashboard?source=quota_exhausted#waitlist";
+    mockResponse(
+      newServer429(
+        {
+          tier: "anonymous",
+          access_tier: "anonymous",
+          quota: { used: 20, limit: 20 },
+          downgraded: { from: "free", reason: "free_pool_exhausted", waitlist },
+        },
+        20,
+      ),
+    );
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /free-tier capacity is used up/);
+    assert.match(err.message, /anonymous level — 20\/day per IP/);
+    assert.ok(err.message.includes(waitlist), "uses meta.downgraded.waitlist verbatim");
+    assert.match(err.message, /does not grant membership/);
+    // A signed-in free user must not be told to sign in or that the key is wrong.
+    assert.doesNotMatch(err.message, /sign in|served as anonymous|invite/i);
   });
 
   test("429 without 'quota' in message → exit 3 rate-limit (not daily quota)", async () => {

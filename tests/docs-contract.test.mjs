@@ -121,8 +121,8 @@ describe("v0.2.8 — full dates + episode url documented in SKILL.md", () => {
 });
 
 describe("v0.2.9 — search is always bounded to the tier window", () => {
-  // The server resolves an omitted --days to the tier maximum (90
-  // anonymous / 365 member); no surface may promise an all-time search
+  // The server resolves an omitted --days to the tier maximum (30
+  // anonymous / 90 free / 365 member); no surface may promise an all-time search
   // or advise omitting --days to widen one.
   const RETIRED = /all-time results|omit for all-time|\(all time|no time filter|omitting `?--days`? (for|or)\b|omit it\./i;
   for (const p of ["skill/askaipods/SKILL.md", "README.md", "src/format.js", "src/cli.js"]) {
@@ -132,8 +132,68 @@ describe("v0.2.9 — search is always bounded to the tier window", () => {
   }
   test("SKILL.md states that an omitted --days means the tier cap", () => {
     const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /omitted = 30/);
     assert.match(body, /omitted = 90/);
     assert.match(body, /omitted = 365/);
+  });
+});
+
+describe("v0.3.0 — three tiers, --sort, degrade notice", () => {
+  // Shipped surfaces that carry tier wording (package.json `files`).
+  const SHIPPED = [
+    "skill/askaipods/SKILL.md",
+    "README.md",
+    "examples/claude-code-install.md",
+    "examples/hermes-install.md",
+    "examples/codex-install.md",
+    "examples/openclaw-install.md",
+    "src/cli.js",
+    "src/client.js",
+    "src/format.js",
+  ];
+  for (const p of SHIPPED) {
+    test(`${p} carries no invite-only / request-access wording`, () => {
+      assert.doesNotMatch(read(p), /invite|request access/i);
+    });
+  }
+
+  test("SKILL.md states the 30 / 90 / 365 caps per tier and no two-tier cap pair", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /30 anonymous \/ 90 free \/ 365 member/);
+    assert.doesNotMatch(body, /90 anonymous \/ 365 member/);
+  });
+
+  test("SKILL.md documents --sort intent mapping, sort / downgraded fields and the disclosures", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /### Ordering-intent mapping \(`--sort`\)/);
+    assert.match(body, /"strongest argument", "best explanation", "history of"/);
+    assert.match(body, /sort\.served !== sort\.requested/);
+    assert.match(body, /\*\*`sort`\*\*/);
+    assert.match(body, /\*\*`downgraded`\*\*/);
+    assert.match(body, /"sort": \{ "requested": "relevance", "served": "relevance" \}/);
+    assert.match(body, /<downgraded\.waitlist>/);
+  });
+
+  test("render_hint is documented by served ordering, not by tier", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /`dual_view` when the server selected by relevance \(`sort\.served === "relevance"`\)/);
+    assert.match(body, /### For `render_hint: "dual_view"` \(results selected by relevance/);
+  });
+
+  test("waitlist copy never promises approval or a timeline", () => {
+    for (const p of ["skill/askaipods/SKILL.md", "README.md", "examples/claude-code-install.md", "examples/hermes-install.md"]) {
+      const body = read(p);
+      assert.match(body, /https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/, `${p} links the waitlist`);
+      assert.match(body, /does not grant membership/, `${p} says joining does not grant membership`);
+      assert.doesNotMatch(body, /added to the waitlist for review|once (approved|invited)/i, p);
+    }
+  });
+
+  test("README tier table has a Free column with the 50/day quota and 90-day cap", () => {
+    const body = read("README.md");
+    assert.match(body, /\| \| Anonymous \(default\) \| Free \| Member \|/);
+    assert.match(body, /\| 30 days \| 90 days \| 365 days \|/);
+    assert.match(body, /50 searches per user/);
   });
 });
 

@@ -4,6 +4,7 @@
 //   --days positive-integer validation
 //   --api-key trim + whitespace + ByteString validation
 //   --format validation
+//   --sort validation (0.3.0)
 //   ASKAIPODS_API_KEY env var fallback
 
 import { test, describe, afterEach, beforeEach } from "node:test";
@@ -210,6 +211,60 @@ describe("run — --days validation", () => {
     const err = await runAndCatch(["--days", "9".repeat(400), "q"]);
     assert.equal(err.exitCode, 1);
     assert.match(err.message, /too large/);
+  });
+});
+
+describe("run — --sort validation (0.3.0)", () => {
+  afterEach(restoreFetch);
+
+  async function bodyFor(argv) {
+    const calls = mockResponse({ body: validEnvelope() });
+    const stdout = muteStdout();
+    try {
+      await run(argv);
+    } finally {
+      stdout.restore();
+    }
+    return JSON.parse(calls[0].init.body);
+  }
+
+  test("default: sort 'recency' is always sent", async () => {
+    assert.equal((await bodyFor(["q"])).sort, "recency");
+  });
+
+  test("--sort relevance reaches the body", async () => {
+    assert.equal((await bodyFor(["--sort", "relevance", "q"])).sort, "relevance");
+  });
+
+  test("--sort recency reaches the body", async () => {
+    assert.equal((await bodyFor(["--sort=recency", "q"])).sort, "recency");
+  });
+
+  for (const bad of ["Relevance", "newest", "", "similarity"]) {
+    test(`rejects --sort ${JSON.stringify(bad)} → usage error exit 1, no request`, async () => {
+      const calls = mockResponse({ body: validEnvelope() });
+      const err = await runAndCatch(["--sort", bad, "q"]);
+      assert.ok(err instanceof AskaipodsError);
+      assert.equal(err.exitCode, 1);
+      assert.match(err.message, /--sort must be 'recency' or 'relevance'/);
+      assert.equal(calls.length, 0);
+    });
+  }
+
+  test("--help documents --sort and the three tiers with caps 30 / 90 / 365", async () => {
+    const stdout = muteStdout();
+    try {
+      await run(["--help"]);
+      const out = stdout.chunks.join("");
+      assert.match(out, /--sort <recency\|relevance>/);
+      assert.match(out, /anonymous 30, free 90, member 365/);
+      assert.match(out, /anonymous \(no key\)/);
+      assert.match(out, /free \(account key\)/);
+      assert.match(out, /member \(member key\)/);
+      assert.doesNotMatch(out, /invite/i);
+    } finally {
+      stdout.restore();
+    }
   });
 });
 

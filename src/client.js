@@ -14,6 +14,18 @@ const PODLENS_ENDPOINT = "https://podlens.net/api/search/semantic";
 const MAX_QUERY_LEN = 300;
 const MIN_QUERY_LEN = 1;
 
+// Closed enums of the three-tier server contract. `meta.tier` stays the
+// legacy two-value field (any non-member caller, including free, reads
+// "anonymous"); `meta.access_tier` carries the real tier on servers that
+// send it.
+const LEGACY_TIERS = new Set(["anonymous", "member"]);
+const ACCESS_TIERS = new Set(["anonymous", "free", "member"]);
+export const SORT_VALUES = new Set(["recency", "relevance"]);
+
+// Paid-membership waitlist on the PodLens dashboard. Used in 429 copy
+// when the server did not supply its own waitlist link.
+const WAITLIST_URL = "https://podlens.net/dashboard?source=askaipods#waitlist";
+
 export class AskaipodsError extends Error {
   constructor(message, exitCode) {
     super(message);
@@ -106,7 +118,8 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                `${url}&t=${anchor_s}s` — otherwise both
 //                                are set to null in place
 //   data.meta                  : non-array object
-//   data.meta.tier             : closed enum {"anonymous","member"}
+//   data.meta.tier             : closed enum {"anonymous","member"} (legacy
+//                                two-value field; free reads "anonymous")
 //   data.meta.quota            : non-array object
 //   data.meta.quota.used       : finite number
 //   data.meta.quota.limit      : finite number
@@ -129,6 +142,15 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                 no render logic depends on its shape,
 //                                 but reject non-object so downstream
 //                                 type assumptions hold)
+//   data.meta.access_tier       — closed enum {"anonymous","free","member"}
+//                                 iff present (absent on servers that
+//                                 predate the free tier); drives the
+//                                 structured `tier` and the tier notes
+//   data.meta.sort              — {requested, served}, both in
+//                                 {"recency","relevance"}, iff present;
+//                                 drives render_hint
+//   data.meta.downgraded        — {from, reason, waitlist} strings iff
+//                                 present; drives the degrade notice
 function isValidSuccessEnvelope(data) {
   if (!isPlainObject(data)) return false;
   if (typeof data.total !== "number" || !Number.isFinite(data.total)) return false;
@@ -167,7 +189,19 @@ function isValidSuccessEnvelope(data) {
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
-  if (m.tier !== "anonymous" && m.tier !== "member") return false;
+  if (!LEGACY_TIERS.has(m.tier)) return false;
+  if (m.access_tier != null && !ACCESS_TIERS.has(m.access_tier)) return false;
+  if (m.sort != null) {
+    if (!isPlainObject(m.sort)) return false;
+    if (!SORT_VALUES.has(m.sort.requested) || !SORT_VALUES.has(m.sort.served)) return false;
+  }
+  if (m.downgraded != null) {
+    if (!isPlainObject(m.downgraded)) return false;
+    const d = m.downgraded;
+    if (typeof d.from !== "string" || typeof d.reason !== "string" || typeof d.waitlist !== "string") {
+      return false;
+    }
+  }
   const q = m.quota;
   if (!isPlainObject(q)) return false;
   if (typeof q.used !== "number" || !Number.isFinite(q.used)) return false;
@@ -267,7 +301,54 @@ function isValidSuccessEnvelope(data) {
   return true;
 }
 
-export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT }) {
+// Daily-quota (429) copy. Tier source, strongest first: the 429
+// envelope's `meta.downgraded` (a free request served at the anonymous
+// level because today's free-tier capacity ran out), then its
+// `meta.access_tier`, then — for servers that send neither — the
+// X-RateLimit-Limit header naming the quota that was actually applied
+// (20 / 50 / 100), then whether a key was sent.
+function quotaExhaustedMessage(meta, limitHeader, apiKey) {
+  const reset = "Quota resets at 00:00 UTC.";
+  if (isPlainObject(meta?.downgraded)) {
+    const waitlist = typeof meta.downgraded.waitlist === "string" ? meta.downgraded.waitlist : WAITLIST_URL;
+    return (
+      "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
+      `anonymous level — 20/day per IP — and that quota is used too). ${reset} ` +
+      `Paid-membership waitlist: ${waitlist} (joining records interest; it does not grant membership).`
+    );
+  }
+  let tier = ACCESS_TIERS.has(meta?.access_tier) ? meta.access_tier : null;
+  if (!tier) {
+    if (limitHeader) {
+      tier = limitHeader === "100" ? "member" : limitHeader === "50" ? "free" : "anonymous";
+    } else {
+      tier = apiKey ? "member" : "anonymous";
+    }
+  }
+  if (tier === "member") {
+    return `daily search quota exhausted (member tier: 100/day). ${reset}`;
+  }
+  if (tier === "free") {
+    return (
+      `daily search quota exhausted (free tier: 50/day). ${reset} ` +
+      "Paid membership (100/day, --days up to 365, relevance ordering) has a waitlist at " +
+      `${WAITLIST_URL} (joining records interest; it does not grant membership).`
+    );
+  }
+  if (apiKey) {
+    return (
+      `daily search quota exhausted (anonymous tier: 20/day per IP — this API key was served as anonymous). ${reset} ` +
+      "Sign in at https://podlens.net and set ASKAIPODS_API_KEY to the API key shown on the dashboard for 50 searches/day."
+    );
+  }
+  return (
+    `daily search quota exhausted (anonymous tier: 20/day per IP). ${reset} ` +
+    "For 50 searches/day, sign in free with Google or GitHub at https://podlens.net " +
+    "and set ASKAIPODS_API_KEY to the account's API key."
+  );
+}
+
+export async function search({ query, days, sort, apiKey, endpoint = PODLENS_ENDPOINT }) {
   if (typeof query !== "string" || query.trim().length < MIN_QUERY_LEN) {
     throw exitErr(1, "query is required (1-300 characters)");
   }
@@ -277,13 +358,16 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.2.10 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.3.0 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
   }
 
-  const body = { q: query };
+  // `sort` is always sent (default recency). A server that predates the
+  // field ignores it; a non-member asking for relevance is served recency
+  // and says so in `meta.sort`.
+  const body = { q: query, sort: sort ?? "recency" };
   if (typeof days === "number" && days > 0) {
     body.days = days;
   }
@@ -363,7 +447,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
     if (!isValidSuccessEnvelope(data)) {
       throw exitErr(
         3,
-        "unexpected response shape from podlens.net (envelope, results entries, meta.tier, or meta.quota failed contract validation). Retry in a moment.",
+        "unexpected response shape from podlens.net (envelope, results entries, meta.tier / access_tier / sort / downgraded, or meta.quota failed contract validation). Retry in a moment.",
       );
     }
     return data;
@@ -373,27 +457,13 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
   // distinct strings for "burst limit hit" vs "daily quota exhausted",
   // and only the latter warrants the "daily quota" exit code. The
   // quota message is tier-aware: a member hitting the 100/day cap must
-  // not be told to "set ASKAIPODS_API_KEY" — they already have one.
+  // not be told to sign in — they already have a key.
   if (response.status === 429) {
     const msg = String(data?.error ?? "").toLowerCase();
     if (msg.includes("quota")) {
-      // The server serves a key that is not member-tier as anonymous; its
-      // X-RateLimit-Limit header names the quota that was actually applied.
+      const meta = isPlainObject(data) && isPlainObject(data.meta) ? data.meta : null;
       const limit = response.headers?.get?.("x-ratelimit-limit");
-      const servedAsMember = limit ? limit === "100" : Boolean(apiKey);
-      let quotaMsg;
-      if (servedAsMember) {
-        quotaMsg = "daily search quota exhausted (member tier: 100/day). Quota resets at 00:00 UTC.";
-      } else if (apiKey) {
-        quotaMsg =
-          "daily search quota exhausted (anonymous tier: 20/day — this API key is not a member-tier key). " +
-          "Quota resets at 00:00 UTC. Member tier is invite-only — request access at https://podlens.net.";
-      } else {
-        quotaMsg =
-          "daily search quota exhausted (anonymous tier: 20/day). Quota resets at 00:00 UTC. " +
-          "For 100 searches/day, set ASKAIPODS_API_KEY — member tier is invite-only, request access at https://podlens.net.";
-      }
-      throw exitErr(2, quotaMsg);
+      throw exitErr(2, quotaExhaustedMessage(meta, limit, apiKey));
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");
   }

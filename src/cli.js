@@ -11,10 +11,10 @@
 //     on isTTY behavior across shells.
 
 import { parseArgs } from "node:util";
-import { search, AskaipodsError } from "./client.js";
+import { search, AskaipodsError, SORT_VALUES } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.2.10";
+const VERSION = "0.3.0";
 
 const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
 
@@ -24,15 +24,22 @@ USAGE:
 
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
-  --days <N>                 Search the last N days first (widened through 30/60/90 when fewer than 20 match; anonymous caps at 90, member at 365; omitted = the cap)
+  --days <N>                 Search the last N days first (widened through 30/60/90 within the tier cap when fewer than 20 match;
+                             caps: anonymous 30, free 90, member 365; omitted = the cap)
+  --sort <recency|relevance> Result selection (default: recency). relevance is member-only — other tiers are
+                             served recency, reported in the output's sort.served
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
   -h, --help                 Show this message
   -v, --version              Show version
 
 ENVIRONMENT:
-  ASKAIPODS_API_KEY          PodLens API key. Without it: 20 searches/day per IP (anonymous).
-                             With it: 100 searches/day per user (member).
-                             Member tier is invite-only — request access at https://podlens.net.
+  ASKAIPODS_API_KEY          PodLens API key. Tiers:
+                               anonymous (no key)   20 searches/day per IP, --days cap 30
+                               free (account key)   50 searches/day per user, --days cap 90 — sign in free
+                                                    with Google or GitHub at https://podlens.net
+                               member (member key)  100 searches/day per user, --days cap 365, --sort relevance;
+                                                    granted by PodLens, not by sign-up (paid-membership
+                                                    waitlist: https://podlens.net/dashboard?source=askaipods#waitlist)
 
 EXIT CODES:
   0  success
@@ -44,6 +51,7 @@ EXIT CODES:
 EXAMPLES:
   askaipods "what are people saying about test-time compute"
   askaipods search "Anthropic safety research" --days 30
+  askaipods "history of RLHF" --sort relevance        (member key)
   askaipods "GPU shortage" --format json | jq .results
 `;
 
@@ -60,6 +68,7 @@ export async function run(argv) {
       options: {
         format: { type: "string" },
         days: { type: "string" },
+        sort: { type: "string" },
         "api-key": { type: "string" },
         help: { type: "boolean", short: "h" },
         version: { type: "boolean", short: "v" },
@@ -134,6 +143,11 @@ export async function run(argv) {
     days = n;
   }
 
+  const sort = values.sort ?? "recency";
+  if (!SORT_VALUES.has(sort)) {
+    throw usageError(`--sort must be 'recency' or 'relevance', got '${sort}'`);
+  }
+
   const format = values.format ?? (process.stdout.isTTY ? "markdown" : "json");
   if (format !== "json" && format !== "markdown") {
     throw usageError(`--format must be 'json' or 'markdown', got '${format}'`);
@@ -185,7 +199,7 @@ export async function run(argv) {
     }
   }
 
-  const response = await search({ query, days, apiKey });
+  const response = await search({ query, days, sort, apiKey });
 
   const output = format === "json" ? renderJson(query, response) : renderMarkdown(query, response);
 
