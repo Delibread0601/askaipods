@@ -172,6 +172,58 @@ describe("isValidSuccessEnvelope — results[].url", () => {
   }
 });
 
+describe("isValidSuccessEnvelope — results[].anchor_s / anchor_url (0.2.9)", () => {
+  afterEach(restoreFetch);
+  const URL = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+
+  test("keeps a consistent pair unchanged (0 s included)", async () => {
+    const data = await callSearch(
+      validEnvelope({
+        total: 2,
+        results: [
+          validResult({ url: URL, anchor_s: 754, anchor_url: `${URL}&t=754s` }),
+          validResult({ url: URL, anchor_s: 0, anchor_url: `${URL}&t=0s` }),
+        ],
+      }),
+    );
+    assert.equal(data.results[0].anchor_s, 754);
+    assert.equal(data.results[0].anchor_url, `${URL}&t=754s`);
+    assert.equal(data.results[1].anchor_s, 0);
+  });
+
+  test("absent / null pair (older servers) → both null", async () => {
+    const data = await callSearch(
+      validEnvelope({ total: 2, results: [validResult({ url: URL }), validResult({ url: URL, anchor_s: null, anchor_url: null })] }),
+    );
+    for (const r of data.results) {
+      assert.equal(r.anchor_s, null);
+      assert.equal(r.anchor_url, null);
+    }
+  });
+
+  const NULLED = [
+    [{ url: URL, anchor_s: 754, anchor_url: `${URL}&t=755s` }, "seconds mismatch"],
+    [{ url: URL, anchor_s: 754, anchor_url: "https://evil.example/?t=754s" }, "foreign url"],
+    [{ url: URL, anchor_s: -1, anchor_url: `${URL}&t=-1s` }, "negative"],
+    [{ url: URL, anchor_s: 1.5, anchor_url: `${URL}&t=1.5s` }, "fractional"],
+    [{ url: null, anchor_s: 60, anchor_url: `${URL}&t=60s` }, "no url"],
+    [{ url: "https://youtu.be/72Im-Mm5JKs", anchor_s: 60, anchor_url: "https://youtu.be/72Im-Mm5JKs&t=60s" }, "url nulled by its own check"],
+    [{ url: URL, anchor_s: 60 }, "anchor_url missing"],
+  ];
+  for (const [fields, description] of NULLED) {
+    test(`nulls an inconsistent pair: ${description}`, async () => {
+      const data = await callSearch(validEnvelope({ total: 1, results: [validResult(fields)] }));
+      assert.equal(data.results[0].anchor_s, null);
+      assert.equal(data.results[0].anchor_url, null);
+    });
+  }
+
+  test("wrong JSON types are a contract break (exit 3)", async () => {
+    await expectEnvelopeRejected(validEnvelope({ total: 1, results: [validResult({ url: URL, anchor_s: "754" })] }));
+    await expectEnvelopeRejected(validEnvelope({ total: 1, results: [validResult({ url: URL, anchor_url: 42 })] }));
+  });
+});
+
 describe("isValidSuccessEnvelope — published_at calendar validation (R3-01)", () => {
   afterEach(restoreFetch);
 

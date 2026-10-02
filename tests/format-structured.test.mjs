@@ -178,7 +178,25 @@ describe("toStructured — field mapping + defaults", () => {
     const s = toStructured("q", env);
     assert.equal(s.results[0].url, url);
     assert.equal(s.results[1].url, null);
-    assert.deepEqual(Object.keys(s.results[0]), ["podcast", "episode", "date", "url", "text", "api_rank"]);
+    assert.deepEqual(Object.keys(s.results[0]), [
+      "podcast", "episode", "date", "url", "anchor_s", "anchor_url", "text", "api_rank",
+    ]);
+  });
+
+  test("anchor_s / anchor_url pass through; absent → null", () => {
+    const url = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+    const env = validEnvelope({
+      total: 2,
+      results: [
+        validResult({ published_at: "2026-09-23", url, anchor_s: 754, anchor_url: `${url}&t=754s` }),
+        validResult({ published_at: "2026-09-01", url }),
+      ],
+    });
+    const s = toStructured("q", env);
+    assert.equal(s.results[0].anchor_s, 754);
+    assert.equal(s.results[0].anchor_url, `${url}&t=754s`);
+    assert.equal(s.results[1].anchor_s, null);
+    assert.equal(s.results[1].anchor_url, null);
   });
 });
 

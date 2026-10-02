@@ -180,6 +180,13 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.doesNotMatch(out, /fuzzed|full dates/);
   });
 
+  test("anonymous note states the bounded default (omitted --days = the cap)", () => {
+    const out = renderMarkdown("q", empty());
+    assert.match(out, /--days capped at 90 \(omitted = 90\)/);
+    assert.match(out, /--days up to 365 \(omitted = 365\)/);
+    assert.doesNotMatch(out, /all-time/);
+  });
+
   test("member empty result does NOT append ANONYMOUS_NOTE", () => {
     const env = validEnvelope({
       meta: { tier: "member", quota: { used: 5, limit: 100 } },
@@ -224,7 +231,27 @@ describe("renderMarkdown — non-empty freshness banner (R2-03, R6-01)", () => {
       window: { requested_days: 30, served_days: 90, expanded: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /No results in the requested 30-day window/);
+    assert.match(out, /Fewer than 20 matches in the requested 30-day window, so the search widened to the last 90 days — results may include episodes older than 30 days\./);
+    // Widening can add nothing older, so the note must not assert that it did.
+    assert.doesNotMatch(out, /are included/);
+    assert.doesNotMatch(out, /No results in the requested/);
+  });
+
+  test("truncated expansion with results says incomplete + retry, not 'widened'", () => {
+    const env = nonEmpty({
+      window: { requested_days: 7, served_days: 7, expanded: true, truncated: true },
+    });
+    const out = renderMarkdown("q", env);
+    assert.match(out, /interrupted by a transient error — results may be incomplete\. Retry in a moment/);
+    assert.doesNotMatch(out, /widened to the last/);
+  });
+
+  test("truncated after a partial widen names the reached window and the older-episode caveat", () => {
+    const env = nonEmpty({
+      window: { requested_days: 7, served_days: 30, expanded: true, truncated: true },
+    });
+    const out = renderMarkdown("q", env);
+    assert.match(out, /widened to the last 30 days before a transient error interrupted it — results may be incomplete and may include episodes older than 7 days\. Retry in a moment/);
   });
 });
 
@@ -266,6 +293,20 @@ describe("renderMarkdown — result rendering", () => {
     const lines = renderMarkdown("q", env).split("\n");
     assert.ok(lines.includes(`*2026-09-23* · ${url}`));
     assert.ok(lines.includes("*2026-09-01*"));
+  });
+
+  test("anchor renders as 'around m:ss' after the url; h:mm:ss past an hour", () => {
+    const url = "https://www.youtube.com/watch?v=72Im-Mm5JKs";
+    const env = validEnvelope({
+      total: 2,
+      results: [
+        validResult({ published_at: "2026-09-23", url, anchor_s: 754, anchor_url: `${url}&t=754s` }),
+        validResult({ published_at: "2026-09-01", url, anchor_s: 3725, anchor_url: `${url}&t=3725s` }),
+      ],
+    });
+    const lines = renderMarkdown("q", env).split("\n");
+    assert.ok(lines.includes(`*2026-09-23* · ${url} · around 12:34: ${url}&t=754s`));
+    assert.ok(lines.includes(`*2026-09-01* · ${url} · around 1:02:05: ${url}&t=3725s`));
   });
 
   test("result text with internal newlines is collapsed to single spaces", () => {

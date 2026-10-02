@@ -12,9 +12,17 @@
 // Relevant" sub-views — see SKILL.md.
 
 const ANONYMOUS_NOTE =
-  "Anonymous tier: up to 20 results sorted newest-first, --days capped at 90 when specified. " +
-  "Set ASKAIPODS_API_KEY for 100 searches/day and --days up to 365 (or omit for all-time). " +
+  "Anonymous tier: up to 20 results sorted newest-first, --days capped at 90 (omitted = 90). " +
+  "Set ASKAIPODS_API_KEY for 100 searches/day and --days up to 365 (omitted = 365). " +
   "Member tier is invite-only — request access at https://podlens.net.";
+
+// Seconds → "m:ss" / "h:mm:ss" for the approximate-timestamp label.
+export function clock(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = String(seconds % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
+}
 
 // Sort results newest-first by parsing each `published_at` to a UTC
 // millisecond timestamp and comparing numerically. Pure lexical compare
@@ -85,10 +93,15 @@ export function toStructured(query, response) {
       podcast: r.podcast_name ?? null,
       episode: r.episode_title ?? null,
       date: r.published_at ?? null,
-      // YouTube watch URL for the episode (start of the video, not the
-      // quote's timestamp); null when the server has none. client.js
-      // already nulled anything outside the watch-URL shape.
+      // YouTube watch URL for the episode (start of the video); null when
+      // the server has none. client.js already nulled anything outside the
+      // watch-URL shape.
       url: r.url ?? null,
+      // Approximate start of the passage the quote comes from (seconds)
+      // and the url opened there; null when the server has no confident
+      // timestamp. client.js keeps them only as a consistent pair.
+      anchor_s: r.anchor_s ?? null,
+      anchor_url: r.anchor_url ?? null,
       text: r.text ?? "",
       api_rank: r.api_rank,
     })),
@@ -163,7 +176,7 @@ export function renderMarkdown(query, response) {
     if (warningCode === "corpus_stale_for_requested_window") {
       const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
       lines.push(
-        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — try a longer \`--days\` value or omit it.`,
+        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — a longer \`--days\` helps only up to your tier cap (90 anonymous / 365 member); omitting \`--days\` already searches the cap.`,
       );
     } else if (warningCode === "index_metadata_stale") {
       lines.push(
@@ -175,14 +188,14 @@ export function renderMarkdown(query, response) {
       // through to generic "rephrase" copy, which would mislead the
       // user into thinking the empty result is their fault.
       lines.push(
-        `No results. The server flagged a freshness issue with this search (code: ${warningCode}) — results may be incomplete or the requested window may be stale. Try omitting \`--days\` or retry in a few minutes.`,
+        `No results. The server flagged a freshness issue with this search (code: ${warningCode}) — results may be incomplete or the requested window may be stale. Try a longer \`--days\` (up to your tier cap) or retry in a few minutes.`,
       );
     } else if (win && win.truncated) {
       lines.push(
-        "No results found (search window expansion was interrupted by a transient error). Try again in a moment, or try a different phrasing.",
+        "No results found (search window expansion was interrupted by a transient error). Try again in a moment.",
       );
     } else if (win && win.expanded) {
-      // SKILL.md §Error handling step 4 mandates appending the
+      // SKILL.md §Error handling step 5 mandates appending the
       // corpus-indexed-through suffix when newest_date is present —
       // an honest freshness signal distinct from the freshness warning
       // (which would have landed on the warning branches above). Keeps
@@ -214,7 +227,7 @@ export function renderMarkdown(query, response) {
   if (warningCode === "corpus_stale_for_requested_window") {
     const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
     lines.push(
-      `*Note: The indexed corpus has no episodes in the requested window${asOf} — results below may come from an expanded window. Try omitting \`--days\` for broader coverage.*`,
+      `*Note: The indexed corpus has no episodes in the requested window${asOf} — results below may come from an expanded window. A longer \`--days\` (up to your tier cap) widens coverage.*`,
     );
     lines.push("");
   } else if (warningCode === "index_metadata_stale") {
@@ -234,9 +247,15 @@ export function renderMarkdown(query, response) {
 
   // Surface window expansion so the user knows the actual time range
   const win = data.meta.window;
+  // The server widens when FEWER THAN 20 matched (results inside the
+  // requested window are kept), so never claim the window was empty.
   if (win && win.expanded) {
     lines.push(
-      `*Note: No results in the requested ${win.requested_days}-day window; showing results from the last ${win.served_days} days.*`,
+      win.truncated
+        ? win.served_days > win.requested_days
+          ? `*Note: The search widened to the last ${win.served_days} days before a transient error interrupted it — results may be incomplete and may include episodes older than ${win.requested_days} days. Retry in a moment.*`
+          : `*Note: Widening the search beyond the requested ${win.requested_days}-day window was interrupted by a transient error — results may be incomplete. Retry in a moment.*`
+        : `*Note: Fewer than 20 matches in the requested ${win.requested_days}-day window, so the search widened to the last ${win.served_days} days — results may include episodes older than ${win.requested_days} days.*`,
     );
     lines.push("");
   }
@@ -252,7 +271,9 @@ export function renderMarkdown(query, response) {
     lines.push(`### ${i + 1}. ${podcast} — ${title}`);
     // Bare URL rather than a [label](url) link: terminals and GFM
     // both auto-link it, while link syntax prints raw in a terminal.
-    lines.push(r.url ? `*${date}* · ${r.url}` : `*${date}*`);
+    let line = r.url ? `*${date}* · ${r.url}` : `*${date}*`;
+    if (r.anchor_url) line += ` · around ${clock(r.anchor_s)}: ${r.anchor_url}`;
+    lines.push(line);
     lines.push("");
     // Quote-block the text and collapse newlines so the markdown stays compact.
     const text = (r.text ?? "").replace(/\s+/g, " ").trim();

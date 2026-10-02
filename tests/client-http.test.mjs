@@ -222,6 +222,28 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.doesNotMatch(err.message, /invite-only/);
   });
 
+  test("429 quota with a key served as anonymous (X-RateLimit-Limit 20) → anonymous message naming the key", async () => {
+    mockResponse({
+      status: 429,
+      body: { error: "Daily search quota exhausted" },
+      headers: { "x-ratelimit-limit": "20" },
+    });
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /anonymous tier: 20\/day — this API key is not a member-tier key/);
+    assert.doesNotMatch(err.message, /member tier: 100\/day/);
+  });
+
+  test("429 quota with X-RateLimit-Limit 100 → member message", async () => {
+    mockResponse({
+      status: 429,
+      body: { error: "Daily search quota exhausted" },
+      headers: { "x-ratelimit-limit": "100" },
+    });
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.match(err.message, /member tier: 100\/day/);
+  });
+
   test("429 without 'quota' in message → exit 3 rate-limit (not daily quota)", async () => {
     mockResponse({
       status: 429,

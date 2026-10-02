@@ -24,13 +24,14 @@ export function restoreFetch() {
 
 // Returns a fetch stub that resolves with the given status + body. Records
 // every call so tests can assert on the outgoing request shape.
-export function mockResponse({ status = 200, body = {}, statusText } = {}) {
+export function mockResponse({ status = 200, body = {}, statusText, headers = {} } = {}) {
   const calls = [];
   const fetchFn = async (url, init) => {
     calls.push({ url, init });
     return {
       ok: status >= 200 && status < 300,
       status,
+      headers: { get: (name) => headers[name.toLowerCase()] ?? null },
       statusText: statusText ?? (status >= 200 && status < 300 ? "OK" : "Error"),
       async json() {
         return body;

@@ -63,35 +63,27 @@ describe("R7-03 — `npx -y askaipods` in SKILL.md and install guides", () => {
   }
 });
 
-describe("R7-04 — Codex CLI skill path corrected to ~/.codex/skills/", () => {
-  test("README documents ~/.codex/skills/ as the Codex path", () => {
-    const body = read("README.md");
-    assert.match(
-      body,
-      /~\/\.codex\/skills\//,
-      "README must use the corrected Codex skills path (R7-04)",
-    );
+describe("Codex CLI skill path — ~/.agents/skills/ (current Codex docs)", () => {
+  // The Codex skills docs list $HOME/.agents/skills as the user-level
+  // location (earlier releases read ~/.codex/skills/); OpenClaw reads the
+  // same directory, so one install serves both.
+  test("README and the Codex guide install into ~/.agents/skills/", () => {
+    for (const p of ["README.md", "examples/codex-install.md"]) {
+      assert.match(read(p), /~\/\.agents\/skills\/askaipods/, `${p} uses ~/.agents/skills/`);
+    }
   });
 
-  test("examples/codex-install.md uses ~/.codex/skills/", () => {
-    const body = read("examples/codex-install.md");
-    assert.match(body, /~\/\.codex\/skills\//);
+  test("no guide tells users to install the Codex copy into ~/.codex/skills/", () => {
+    for (const p of ["README.md", "examples/codex-install.md", "examples/openclaw-install.md"]) {
+      assert.doesNotMatch(read(p), /~\/\.codex\/skills\/askaipods|mkdir -p ~\/\.codex\/skills/, p);
+    }
   });
 
-  test("examples/openclaw-install.md documents the R7-04 correction (R14-01 negative guard)", () => {
-    const body = read("examples/openclaw-install.md");
-    // Correction landed in v0.2.5: the guide now explicitly distinguishes
-    // OpenClaw's location from Codex's ~/.codex/skills/, AND disavows the
-    // earlier incorrect "shared with Codex" claim so a future edit cannot
-    // silently reintroduce it.
-    assert.match(body, /~\/\.codex\/skills\//);
-    assert.match(
-      body,
-      /earlier version of this guide claimed/i,
-      "guide must preserve the disavowal of the earlier incorrect `~/.agents/skills/ shared with Codex` claim (R7-04)",
-    );
+  test("examples/openclaw-install.md notes the shared ~/.agents/skills/ location", () => {
+    assert.match(read("examples/openclaw-install.md"), /also the user-level location OpenAI Codex CLI documents/);
   });
 });
+
 
 describe("R7-01 — SKILL.md argv-safety rule present", () => {
   test("SKILL.md documents the argv-array invocation form", () => {
@@ -109,11 +101,58 @@ describe("R7-01 — SKILL.md argv-safety rule present", () => {
   });
 });
 
+describe("v0.2.9 — approximate anchors documented in SKILL.md", () => {
+  test("SKILL.md documents anchor_s / anchor_url as approximate and renders them", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /\*\*`results\[\]\.anchor_s` \/ `results\[\]\.anchor_url`\*\*/);
+    assert.match(body, /\[YouTube ~<m:ss>\]\(<anchor_url>\)/, "render rule for the timestamp link");
+    assert.match(body, /around m:ss/);
+    assert.match(body, /never as the exact moment/);
+  });
+});
+
 describe("v0.2.8 — full dates + episode url documented in SKILL.md", () => {
   test("SKILL.md documents results[].url, renders it, and drops the month-fuzz claim", () => {
     const body = read("skill/askaipods/SKILL.md");
     assert.match(body, /\*\*`results\[\]\.url`\*\*/, "field note for results[].url");
     assert.match(body, /\[YouTube\]\(<url>\)/, "render templates carry the YouTube link");
     assert.doesNotMatch(body, /fuzzed|date_precision|month-precision/);
+  });
+});
+
+describe("v0.2.9 — search is always bounded to the tier window", () => {
+  // The server resolves an omitted --days to the tier maximum (90
+  // anonymous / 365 member); no surface may promise an all-time search
+  // or advise omitting --days to widen one.
+  const RETIRED = /all-time results|omit for all-time|\(all time|no time filter|omitting `?--days`? (for|or)\b|omit it\./i;
+  for (const p of ["skill/askaipods/SKILL.md", "README.md", "src/format.js", "src/cli.js"]) {
+    test(`${p} carries no all-time / omit-to-widen claim`, () => {
+      assert.doesNotMatch(read(p), RETIRED);
+    });
+  }
+  test("SKILL.md states that an omitted --days means the tier cap", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /omitted = 90/);
+    assert.match(body, /omitted = 365/);
+  });
+});
+
+describe("v0.2.9 — corpus scope matches PodLens (AI-centred, five domains)", () => {
+  // The corpus is centred on AI but also covers venture capital, global
+  // markets & finance, semiconductors & compute, and tech policy &
+  // geopolitics (podlens.net llms.txt) — no surface may call it AI-only.
+  const RETIRED = /AI-focused|non-AI topics|sparse and noisy|dozens (of other AI podcasts|more)/i;
+  for (const p of ["skill/askaipods/SKILL.md", "README.md", "package.json", "src/cli.js"]) {
+    test(`${p} does not describe the corpus as AI-only`, () => {
+      assert.doesNotMatch(read(p), RETIRED);
+    });
+  }
+  test("SKILL.md and README.md name the non-AI domains", () => {
+    for (const p of ["skill/askaipods/SKILL.md", "README.md"]) {
+      const body = read(p);
+      for (const domain of [/venture capital/, /global markets & finance/, /semiconductors & compute/, /tech policy & geopolitics/]) {
+        assert.match(body, domain, `${p} names ${domain}`);
+      }
+    }
   });
 });

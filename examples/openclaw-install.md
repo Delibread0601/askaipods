@@ -7,7 +7,7 @@
 3. `~/.agents/skills/` — personal agent skills
 4. `~/.openclaw/skills/` — managed/local skills (shared across all agents on the machine)
 
-> **Note**: An earlier version of this guide claimed `~/.agents/skills/` was shared with OpenAI Codex CLI. That was incorrect — Codex CLI reads user-level skills from `~/.codex/skills/` per the [official Codex skills docs](https://developers.openai.com/codex/skills). If you also use Codex CLI, install askaipods into `~/.codex/skills/askaipods/` separately (see [examples/codex-install.md](codex-install.md)).
+> **Note**: `~/.agents/skills/` (location 3) is also the user-level location OpenAI Codex CLI documents ([official Codex skills docs](https://developers.openai.com/codex/skills)), so an install there serves both runtimes (see [examples/codex-install.md](codex-install.md)).
 
 ## Recommended install
 
@@ -53,7 +53,7 @@ OpenClaw should recognize the trigger phrase, shell out to `npx -y askaipods sea
 
 ## Troubleshooting
 
-- **Skill not detected**: Run `openclaw skills update --all` to refresh, or restart the OpenClaw session. Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
+- **Skill not detected**: Restart the OpenClaw Gateway (`openclaw skills update` tracks ClawHub installs only, not this Git/copied install). Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
 - **`npx askaipods` fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
 - **Conflicting copies across precedence levels**: Only the highest-precedence one wins. If you have askaipods in both `~/.agents/skills/` and `<workspace>/skills/`, the workspace one takes effect.
 

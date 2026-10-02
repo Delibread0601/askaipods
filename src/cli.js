@@ -14,9 +14,9 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.2.8";
+const VERSION = "0.2.9";
 
-const HELP_TEXT = `askaipods ${VERSION} — search AI podcast quotes by topic
+const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
 
 USAGE:
   askaipods <query>
@@ -24,7 +24,7 @@ USAGE:
 
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
-  --days <N>                 Only return results from the last N days (anonymous tier caps at 90; member tier caps at 365)
+  --days <N>                 Search the last N days first (widened through 30/60/90 when fewer than 20 match; anonymous caps at 90, member at 365; omitted = the cap)
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
   -h, --help                 Show this message
   -v, --version              Show version

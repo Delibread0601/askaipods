@@ -99,6 +99,12 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //   data.results[i].url        : string or null/undefined; a string that
 //                                is not a YouTube watch URL is coerced
 //                                to null in place (see YOUTUBE_WATCH_URL)
+//   data.results[i].anchor_s   : number or null/undefined (server 0015+)
+//   data.results[i].anchor_url : string or null/undefined; the pair is
+//                                kept only when anchor_s is a non-negative
+//                                safe integer AND anchor_url is exactly
+//                                `${url}&t=${anchor_s}s` — otherwise both
+//                                are set to null in place
 //   data.meta                  : non-array object
 //   data.meta.tier             : closed enum {"anonymous","member"}
 //   data.meta.quota            : non-array object
@@ -147,6 +153,17 @@ function isValidSuccessEnvelope(data) {
       if (typeof item.url !== "string") return false;
       if (!YOUTUBE_WATCH_URL.test(item.url)) item.url = null;
     }
+    // anchor_s / anchor_url: the approximate start of the passage the
+    // quote comes from.  Same split: a wrong JSON type is a contract
+    // break; a value that is not the exact url&t=<s>s pair is nulled, so
+    // a host agent never renders an arbitrary or mismatched time link.
+    if (item.anchor_s != null && typeof item.anchor_s !== "number") return false;
+    if (item.anchor_url != null && typeof item.anchor_url !== "string") return false;
+    const s = item.anchor_s;
+    const pairOk = Number.isSafeInteger(s) && s >= 0 && typeof item.url === "string"
+      && item.anchor_url === `${item.url}&t=${s}s`;
+    item.anchor_s = pairOk ? s : null;
+    item.anchor_url = pairOk ? item.anchor_url : null;
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
@@ -260,7 +277,7 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.2.8 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.2.9 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
@@ -360,10 +377,22 @@ export async function search({ query, days, apiKey, endpoint = PODLENS_ENDPOINT 
   if (response.status === 429) {
     const msg = String(data?.error ?? "").toLowerCase();
     if (msg.includes("quota")) {
-      const quotaMsg = apiKey
-        ? "daily search quota exhausted (member tier: 100/day). Quota resets at 00:00 UTC."
-        : "daily search quota exhausted (anonymous tier: 20/day). Quota resets at 00:00 UTC. " +
+      // The server serves a key that is not member-tier as anonymous; its
+      // X-RateLimit-Limit header names the quota that was actually applied.
+      const limit = response.headers?.get?.("x-ratelimit-limit");
+      const servedAsMember = limit ? limit === "100" : Boolean(apiKey);
+      let quotaMsg;
+      if (servedAsMember) {
+        quotaMsg = "daily search quota exhausted (member tier: 100/day). Quota resets at 00:00 UTC.";
+      } else if (apiKey) {
+        quotaMsg =
+          "daily search quota exhausted (anonymous tier: 20/day — this API key is not a member-tier key). " +
+          "Quota resets at 00:00 UTC. Member tier is invite-only — request access at https://podlens.net.";
+      } else {
+        quotaMsg =
+          "daily search quota exhausted (anonymous tier: 20/day). Quota resets at 00:00 UTC. " +
           "For 100 searches/day, set ASKAIPODS_API_KEY — member tier is invite-only, request access at https://podlens.net.";
+      }
       throw exitErr(2, quotaMsg);
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");

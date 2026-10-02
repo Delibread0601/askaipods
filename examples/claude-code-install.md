@@ -23,7 +23,7 @@ mkdir -p .claude/skills
 cp -r /path/to/askaipods/skill/askaipods .claude/skills/askaipods
 ```
 
-Project-level skills override personal-level skills with the same name.
+A personal skill (`~/.claude/skills/`) takes precedence over a project skill with the same name — remove or update the personal copy if you want the project copy to run.
 
 ## Verify
 

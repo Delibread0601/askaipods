@@ -28,7 +28,7 @@ Hermes should pick up the skill from `~/.hermes/skills/askaipods/`, shell out to
 
 - **`npx askaipods` fails**: Hermes is Python-based but the askaipods CLI is Node. Make sure Node.js 18.3.0+ is on PATH alongside Python: `node --version`.
 - **Skill not picked up**: Hermes documentation indicates skills are loaded from `~/.hermes/skills/`. Restart the agent after install if needed.
-- **Quota exhausted**: Set `ASKAIPODS_API_KEY` in your shell environment before launching Hermes so the variable propagates to subprocess calls.
+- **Quota exhausted**: The member tier (100/day) is invite-only — request access at https://podlens.net. With a member key, set `ASKAIPODS_API_KEY` in your shell environment before launching Hermes so the variable propagates to subprocess calls.
 
 ## Reference
 
