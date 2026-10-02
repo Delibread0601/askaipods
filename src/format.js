@@ -40,7 +40,8 @@ function tierNote(data) {
     const waitlist = typeof data.meta.cta?.waitlist === "string" ? data.meta.cta.waitlist : WAITLIST_URL;
     return (
       `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
-      "Relevance ordering, --days up to 365 and 100 searches/day come with paid membership — " +
+      "Relevance ordering, --days up to 365 and 100 searches/day are member features; membership is granted " +
+      "by PodLens and paid membership is not open yet — " +
       `waitlist: ${waitlist} (joining records interest; it does not grant membership).`
     );
   }

@@ -108,42 +108,42 @@ npx -y askaipods search --sort relevance --format json -- <SHELL_QUOTED_QUERY>
 
 ## JSON shape returned by the CLI
 
-The example below is a **member-tier** response to `--sort relevance`. Recency-selected responses (`sort.served: "recency"` — every anonymous and free response, and member responses with the default sort) carry `render_hint: "single_view"`. Anonymous and free responses also differ in: top-level `tier` (`"anonymous"` / `"free"`), lower `meta.quota.limit` (20 / 50), a fuller `meta.restrictions` object describing the tier's caps, and a `meta.cta` object (see field notes below).
+The example below is a **member-tier** response to `--sort relevance --days 7` that had to widen its window (a single match, so it is also a partial fill). Recency-selected responses (`sort.served: "recency"` — every anonymous and free response, and member responses with the default sort) carry `render_hint: "single_view"`. Anonymous and free responses also differ in: top-level `tier` (`"anonymous"` / `"free"`), lower `meta.quota.limit` (20 / 50), a fuller `meta.restrictions` object describing the tier's caps, and a `meta.cta` object (see field notes below).
 
 ```json
 {
   "tier": "member",
   "query": "the user's query string",
-  "fetched_at": "<ISO-8601 timestamp set by the CLI at request time>",
+  "fetched_at": "<ISO-8601 timestamp set by the CLI when it received the response>",
   "render_hint": "dual_view",
   "sort": { "requested": "relevance", "served": "relevance" },
   "downgraded": null,
   "results": [
     {
-      "podcast": "Dwarkesh Patel",
-      "episode": "Dario Amodei on the future of AI",
-      "date": "2026-03-15",
-      "url": "https://www.youtube.com/watch?v=AbCdEfGhIjK",
-      "anchor_s": 754,
-      "anchor_url": "https://www.youtube.com/watch?v=AbCdEfGhIjK&t=754s",
-      "text": "the actual quote excerpt ...",
+      "podcast": "Dwarkesh Podcast",
+      "episode": "OpenAI researcher on agent swarms & recursive self-improvement",
+      "date": "2026-09-17",
+      "url": "https://www.youtube.com/watch?v=6AgOfiZOWiY",
+      "anchor_s": 80,
+      "anchor_url": "https://www.youtube.com/watch?v=6AgOfiZOWiY&t=80s",
+      "text": "Pushing serial test-time compute further hits a latency bottleneck, so multi-agent is a way of scaling test-time compute in parallel instead of purely serially (Brown: 'You don't want to sit around for three years waiting for a response').",
       "api_rank": 1
     }
   ],
   "meta": {
-    "total_returned": 20,
-    "quota": { "used": 3, "limit": 100, "period": "daily", "next_reset": "2026-04-21T00:00:00Z" },
+    "total_returned": 1,
+    "quota": { "used": 3, "limit": 100, "period": "daily", "next_reset": "2026-10-03T00:00:00Z" },
     "restrictions": { "max_days": 365 },
     "query_hash": "...",
     "window": {
       "requested_days": 7,
-      "served_days": 30,
+      "served_days": 90,
       "expanded": true,
-      "attempted_days": [7, 30],
-      "reason_code": "expanded_topk_filled"
+      "attempted_days": [7, 30, 60, 90],
+      "reason_code": "expanded_partial_fill"
     },
-    "corpus_freshness": { "newest_date": "2026-04-18" },
     "warning": null,
+    "corpus_freshness": { "newest_date": "2026-10-01" },
     "cta": null
   }
 }
@@ -152,8 +152,8 @@ The example below is a **member-tier** response to `--sort relevance`. Recency-s
 Field notes that affect how you render:
 
 - **`tier`** — the tier the server applied: `member` (an active member key), `free` (the key of a free podlens.net account), or `anonymous` (no key, a key the server did not accept as free or member, or a free request run at the anonymous level — see `downgraded`). Use the returned value, not whether a key was set. It drives the closing tier note below. Servers that predate the free tier report only `anonymous` or `member`. On exit `0`, `tier` is always one of these values — there is no "unknown" path to handle (the CLI validates the upstream response and exits `3` if the value is missing or unexpected).
-- **`fetched_at`** — ISO-8601 timestamp set by the CLI at request time (not by the server). Use it for staleness: if the user asks about the same topic again later in the session, compare `fetched_at` against the current time to decide whether to re-query or reuse the cached output. A reasonable freshness threshold is ~30 minutes for time-sensitive queries and ~2 hours for broad research.
-- **`render_hint`** — `dual_view` when the server selected by relevance (`sort.served === "relevance"`), `single_view` when it selected by recency. Honor this. The reason: recency results are the 20 newest of the ~60 most similar matches, sorted by `published_at` desc (newest-first) by the API, so `api_rank` reflects temporal order, not semantic relevance — showing a "Top Most Relevant" section for them would mislead the user. Relevance results arrive in similarity order, so `api_rank` is meaningful for relevance-based views. (When `sort` is `null` — a server that predates it — member results were relevance-selected and anonymous ones recency-selected, and `render_hint` follows that.)
+- **`fetched_at`** — ISO-8601 timestamp set by the CLI when it received the response (not by the server). Use it for staleness: if the user asks about the same topic again later in the session, compare `fetched_at` against the current time to decide whether to re-query or reuse the cached output. A reasonable freshness threshold is ~30 minutes for time-sensitive queries and ~2 hours for broad research.
+- **`render_hint`** — `dual_view` when the server selected by relevance (`sort.served === "relevance"`), `single_view` when it selected by recency. Honor this. The reason: recency results are the 20 newest of the most similar matches (up to 60 per searched window), sorted by `published_at` desc (newest-first) by the API, so `api_rank` reflects temporal order, not semantic relevance — showing a "Top Most Relevant" section for them would mislead the user. Relevance results arrive in similarity order, so `api_rank` is meaningful for relevance-based views. (When `sort` is `null` — a server that predates it — member results were relevance-selected and anonymous ones recency-selected, and `render_hint` follows that.)
 - **`sort`** — `{ "requested": ..., "served": ... }`, each `"recency"` or `"relevance"`: the ordering the CLI asked for and the one the server ran. `null` on servers that predate the field. When `served !== requested`, disclose it (see §Ordering-intent mapping).
 - **`downgraded`** — `null` in the common case. When non-null (`{ "from": "free", "reason": "free_pool_exhausted", "waitlist": "<url>" }`), today's free-tier capacity is used up, so this free request ran at the anonymous level (30-day `--days` cap, 20 searches/day per IP) and `tier` reads `anonymous`. Tell the user so, with the `waitlist` link to the paid-membership waitlist (see the degrade banner rule below).
 - **`results[]`** — already sorted **newest first** by the CLI. Each result carries `api_rank`, its position in the API's original ordering. **For relevance-selected results** (`render_hint: "dual_view"`), `api_rank` 1 = most semantically relevant — you can derive a "Top Relevant" sub-view without re-querying. **For recency-selected results** (`single_view`), the API sorts by date, so `api_rank` reflects temporal order (1 = newest), not relevance — see the `render_hint` note above for why a "Top Relevant" view should not be rendered for them.
@@ -161,7 +161,7 @@ Field notes that affect how you render:
 - **`results[].date` format** — `YYYY-MM-DD` (or a full ISO timestamp) on every tier. Display whatever you got — if a date ever arrives as month-only `YYYY-MM` (older server versions sent that for anonymous tier), show it as is and don't guess a day.
 - **`results[].url`** — the episode's YouTube watch URL (`https://www.youtube.com/watch?v=<id>`), on every tier. It opens the episode at the start, not at the quote. `null` when the source has no link (the CLI also nulls any value that isn't a YouTube watch URL); the key is missing entirely when an askaipods CLI older than 0.2.8 ran. Render it only as given — never build or guess a URL from the podcast or episode title.
 - **`results[].anchor_s` / `results[].anchor_url`** — an APPROXIMATE start of the passage the quote comes from: `anchor_s` in seconds, `anchor_url` = `url` + `&t=<anchor_s>s` (the video opens about 10 seconds before the matched passage). Both `null` when PodLens has no confident timestamp (then fall back to `url`); the keys are missing entirely when an askaipods CLI older than 0.2.9 ran. Describe it as "around m:ss" — never as the exact moment the quote is said, and never compute a timestamp yourself.
-- **`meta.quota`** — passed through from the podlens.net API. `used` and `limit` are guaranteed present (the CLI validates them as part of the success envelope); `period` is typically `"daily"`, `next_reset` is an ISO-8601 timestamp, and **`refunded`** (optional boolean) — when present and `true`, the server refunded this request's quota slot under its P1-b narrow-refund rule (triggered when a freshness warning — `corpus_stale_for_requested_window` or `index_metadata_stale` — fired AND zero results were delivered). The field is often absent; check with `quota.refunded === true` rather than `typeof quota.refunded === "boolean"`. When set, mention in the response that the search didn't count against the user's quota — it's a transparency signal worth surfacing.
+- **`meta.quota`** — passed through from the podlens.net API. `used` and `limit` are guaranteed present (the CLI validates them as part of the success envelope); `period` is typically `"daily"`, `next_reset` is an ISO-8601 timestamp, and **`refunded`** (optional boolean) — when present and `true`, the server refunded this request's quota slot. It refunds only when a freshness warning — `corpus_stale_for_requested_window` or `index_metadata_stale` — fired AND zero results were delivered, at most 5 times per user (or IP) per UTC day, so the warning alone does not mean a refund. The field is often absent; check with `quota.refunded === true` rather than `typeof quota.refunded === "boolean"`. When set, mention in the response that the search didn't count against the user's quota — it's a transparency signal worth surfacing.
 - **`meta.restrictions`** — for member tier, an object describing the member cap (currently `{ max_days: 365 }`); for anonymous and free tiers, a fuller object (e.g., `{ max_results: 20, text_truncated: false, results_randomized: false, max_days: 30, order: "published_at_desc" }` — `max_days: 90` for free). For anonymous and free tiers, the closing tier note (templated below) is the right way to surface the cap — take the number from `max_days`; for member tier, the field is informational only. Do not branch tier on this field — use the top-level `tier` field.
 - **`meta.window`** — present when the API includes window expansion metadata (may be `null` for older server versions). When the requested window returns fewer than 20 matches, the API automatically retries wider windows from `[30, 60, 90]` days — only windows longer than the requested one and within the tier cap, so an omitted `--days` (already the cap) never expands. The `window` object contains:
   - `requested_days` — the window applied: the `--days` value capped at the tier max, or the tier max when `--days` is omitted.
@@ -174,7 +174,7 @@ Field notes that affect how you render:
     - `"exhausted_windows_empty"` — wider windows tried AND delivered nothing.
   - `truncated` — `true` when a fallback query errored mid-expansion, aborting further windows. When present, `reason_code` is suppressed.
 
-  **When `expanded` is `true` AND results were delivered**, tell the user: "Fewer than 20 matches in the requested N-day window, so the search widened to the last M days — results may include episodes older than N days" (using `requested_days` and `served_days`); if `window.truncated === true`, say instead that widening was interrupted by a transient error (when `served_days` > `requested_days`, after reaching M days — so results may also include episodes older than N days), results may be incomplete, and a retry may help. When `expanded` is `true` AND results are empty AND `window.truncated` is not `true`, the API tried all available windows and genuinely found nothing — prefer checking `meta.warning` first for a freshness-aware message before falling back to generic "no results" copy. When `window.truncated === true`, expansion was aborted mid-way by a transient Vectorize error rather than running the full window plan; tell the user to retry rather than rephrase (see the §Error handling priority ladder below for the canonical ordering).
+  **When `expanded` is `true` AND results were delivered**, tell the user: "Fewer than 20 matches in the requested N-day window, so the search widened to the last M days — results may include episodes older than N days" (using `requested_days` and `served_days`); if `window.truncated === true`, say instead that widening was interrupted by a transient error (when `served_days` > `requested_days`, after reaching M days — so results may also include episodes older than N days), results may be incomplete, and a retry may help. When `expanded` is `true` AND results are empty AND `window.truncated` is not `true`, the widened search delivered nothing — prefer checking `meta.warning` first for a freshness-aware message before falling back to generic "no results" copy. When `window.truncated === true`, expansion was aborted mid-way by a transient Vectorize error rather than running the full window plan; tell the user to retry rather than rephrase (see the §Error handling priority ladder below for the canonical ordering).
 - **`meta.corpus_freshness`** — `{ "newest_date": "YYYY-MM-DD" | null }`. The latest `published_at` indexed in the corpus. Use it as an honest "data as of X" signal, especially when results are empty and `meta.warning` indicates a stale corpus. `null` when the corpus-freshness probe failed server-side — render "date unknown" rather than omitting.
 - **`meta.warning`** — `null` in the common case. When present, an object `{ "code": "..." }` signalling an honest server-side explanation for an empty or partial response:
   - `"corpus_stale_for_requested_window"` — the newest indexed episode predates the search window's cutoff (the `--days` value, or the tier maximum when `--days` is omitted). Tell the user: "No episodes indexed in the requested window (newest indexed episode: `<corpus_freshness.newest_date>`). Try a longer `--days` value (up to your tier cap of 30 anonymous / 90 free / 365 member; omitting `--days` already searches that cap)." **Do NOT** suggest rephrasing the query — the cause is freshness, not semantics.
@@ -260,7 +260,7 @@ If the same result appears in both Latest and Top Relevant sections, that's fine
 *Anonymous tier: up to 20 results sorted newest-first, `--days` capped at 30 (omitted = 30). Sign in free with Google or GitHub at https://podlens.net and set `ASKAIPODS_API_KEY` to the account's API key for 50 searches/day and `--days` up to 90.*
 
 (for "free":)
-*Free tier: up to 20 results sorted newest-first, `--days` capped at 90 (omitted = 90). Relevance ordering, `--days` up to 365 and 100 searches/day come with paid membership — waitlist: <meta.cta.waitlist, or https://podlens.net/dashboard?source=askaipods#waitlist when absent> (joining records interest; it does not grant membership).*
+*Free tier: up to 20 results sorted newest-first, `--days` capped at 90 (omitted = 90). Relevance ordering, `--days` up to 365 and 100 searches/day are member features; membership is granted by PodLens and paid membership is not open yet — waitlist: <meta.cta.waitlist, or https://podlens.net/dashboard?source=askaipods#waitlist when absent> (joining records interest; it does not grant membership).*
 
 (no closing note for "member", nor when `downgraded` is non-null; take the cap number from `meta.restrictions.max_days` when present — servers that predate the free tier report 90 for anonymous)
 ```
@@ -297,7 +297,7 @@ The CLI uses stable exit codes so you can branch on the failure mode:
 | `2` | Daily quota exhausted | Surface the CLI's stderr message verbatim — it is already tier-aware (distinct copy for anonymous, free, member, and a free request run at the anonymous level) and includes the correct reset time and next step. |
 | `3` | Transient or unexpected failure (network error, rate-limit burst, service 503, protocol/shape error, or internal exception) | Read stderr first: "rate limited … Retry in a minute" → wait about a minute, then retry once; "Daily capacity reached" → do not retry today, tell the user; anything else → retry once after a brief pause. If it fails again, surface the CLI's stderr message verbatim — it distinguishes "rate limited, retry in a minute" from "podlens.net temporarily unavailable" from "unexpected response shape" from internal exceptions, so the user sees the actionable detail. |
 
-If the `results` array is empty (zero matches above the similarity threshold), check the honesty signals in this priority order — freshness warnings dominate because they tell the user something stronger than "rephrase your query". `meta.warning` and `meta.window` are both nullable (the server omits either when not applicable), so use optional chaining (`?.`) when implementing these checks — absent fields must fall through to step 6 rather than throwing:
+If the `results` array is empty (no usable matches were delivered), check the honesty signals in this priority order — freshness warnings dominate because they tell the user something stronger than "rephrase your query". `meta.warning` and `meta.window` are both nullable (the server omits either when not applicable), so use optional chaining (`?.`) when implementing these checks — absent fields must fall through to step 6 rather than throwing:
 
 1. **`meta.warning?.code === "corpus_stale_for_requested_window"`** — corpus has no indexed episodes in the requested window. Tell the user: "No episodes indexed in the requested window (newest indexed episode: `<meta.corpus_freshness.newest_date>`). Try a longer `--days` value (up to your tier cap of 30 anonymous / 90 free / 365 member; omitting `--days` already searches that cap)." Do NOT suggest rephrasing the query.
 2. **`meta.warning?.code === "index_metadata_stale"`** — fresh episodes exist but haven't propagated to the vector index. Tell the user: "Recently indexed episodes are still propagating to the search index — retry in a few minutes."
@@ -306,7 +306,7 @@ If the `results` array is empty (zero matches above the similarity threshold), c
 5. **`meta.window?.expanded === true`** — the API widened the window (e.g., 7→30 days) and still found nothing. Tell the user: "No quotes found. The API expanded the search from N to M days but found no matches. Try rephrasing or broadening the query." If `meta.corpus_freshness?.newest_date` is present, append "(corpus indexed through `<newest_date>`)" as an honest data-freshness signal.
 6. **Otherwise** (no warning, no expansion): say "No quotes found for that topic. The corpus covers AI/ML, venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics — for a topic outside these, a web search may serve better; otherwise try rephrasing or broadening the query."
 
-If `meta.quota.refunded === true`, add a one-line note at the end: "_This search was refunded — it did not count against your daily quota._" (The server's P1-b narrow-refund rule fires when a freshness warning fired AND zero results are delivered.)
+If `meta.quota.refunded === true`, add a one-line note at the end: "_This search was refunded — it did not count against your daily quota._" (The server refunds only when a freshness warning fired AND zero results were delivered, at most 5 times per user (or IP) per UTC day — rely on `refunded`, not on the warning.)
 
 Do not invent quotes to fill the gap.
 

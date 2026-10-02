@@ -49,9 +49,9 @@ EXIT CODES:
      protocol error / internal exception (stderr has the actionable detail)
 
 EXAMPLES:
-  askaipods "what are people saying about test-time compute"
+  askaipods "when will AGI arrive"
   askaipods search "Anthropic safety research" --days 30
-  askaipods "history of RLHF" --sort relevance        (member key)
+  askaipods "history of RLHF" --sort relevance        # relevance needs a member key
   askaipods "GPU shortage" --format json | jq .results
 `;
 

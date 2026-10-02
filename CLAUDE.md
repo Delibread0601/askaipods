@@ -22,7 +22,7 @@ This rule applies to the GitHub release body only — not to git commit messages
 
 ## Zero-dependency constraint
 
-`package.json` has empty `dependencies` and `devDependencies` objects, and should stay that way. This is a load-bearing design choice — no dependency means no supply-chain surface for a CLI that agents run via `npx -y`.
+`package.json` declares no `dependencies` or `devDependencies`, and should stay that way. This is a load-bearing design choice — no dependency means no supply-chain surface for a CLI that agents run via `npx -y`.
 
 - Tests must use `node:test` + `node:assert/strict` from the Node standard library. Do not add `jest`, `mocha`, `vitest`, or any other test framework.
 - Runtime must stay on Node 18.3.0+ built-ins: `fetch`, `AbortSignal.timeout`, `parseArgs` from `node:util`, `Headers`, `URL`, etc. Do not add `node-fetch`, `commander`, `yargs`, or similar.

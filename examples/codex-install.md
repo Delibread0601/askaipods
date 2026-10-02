@@ -1,6 +1,6 @@
 # Install askaipods in OpenAI Codex CLI
 
-Codex CLI loads user-level skills from `~/.agents/skills/` and project-scoped skills from `.agents/skills/` within the repository workspace (earlier Codex releases read user-level skills from `~/.codex/skills/`). `~/.agents/skills/` is also OpenClaw's personal skills location, so one install serves both. For the authoritative scope list and any system-level paths your installed version supports, consult the [official Codex skills documentation](https://developers.openai.com/codex/skills).
+Codex CLI loads user-level skills from `~/.agents/skills/` and project-scoped skills from `.agents/skills/` within the repository workspace (earlier Codex releases read user-level skills from `~/.codex/skills/`). `~/.agents/skills/` is also OpenClaw's personal skills location, so one install serves both. For the authoritative scope list and any system-level paths your installed version supports, consult the [official Codex skills documentation](https://learn.chatgpt.com/docs/build-skills).
 
 For most users, the **user-level** install is what you want — it makes `askaipods` available across every project.
 
@@ -43,5 +43,5 @@ Codex should detect the trigger, run `npx -y askaipods search --format json -- "
 
 ## Reference
 
-- [OpenAI Codex skills documentation](https://developers.openai.com/codex/skills/)
+- [OpenAI Codex skills documentation](https://learn.chatgpt.com/docs/build-skills)
 - [agentskills.io specification](https://agentskills.io/specification)

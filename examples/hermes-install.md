@@ -20,14 +20,14 @@ cp -r ~/Code/askaipods/skill/askaipods ~/.hermes/skills/askaipods
 
 In a Hermes session, ask:
 
-> Find what AI podcasts are saying about test-time compute
+> Find what AI podcasts are saying about coding agents replacing software engineers
 
 Hermes should pick up the skill from `~/.hermes/skills/askaipods/`, shell out to `npx -y askaipods ...` (argv-style per SKILL.md's invocation rule), and present the structured results.
 
 ## Troubleshooting
 
 - **`npx askaipods` fails**: Hermes is Python-based but the askaipods CLI is Node. Make sure Node.js 18.3.0+ is on PATH alongside Python: `node --version`.
-- **Skill not picked up**: Hermes documentation indicates skills are loaded from `~/.hermes/skills/`. Restart the agent after install if needed.
+- **Skill not picked up**: Hermes loads skills from `~/.hermes/skills/`. If `askaipods` is not listed, start a new Hermes session.
 - **Quota exhausted**: Anonymous use allows 20 searches/day per IP. Sign in free with Google or GitHub at https://podlens.net for an API key with 50/day, and set `ASKAIPODS_API_KEY` in your shell environment before launching Hermes so the variable propagates to subprocess calls. Free users who need more can join the paid-membership waitlist at https://podlens.net/dashboard?source=askaipods#waitlist (joining records interest; it does not grant membership).
 
 ## Reference

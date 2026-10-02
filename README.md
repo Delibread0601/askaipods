@@ -3,29 +3,54 @@
 > Search podcast quotes about AI and tech investing — recent episode excerpts from 70+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), surfaced as short indexed quotes (no per-speaker attribution). A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
-$ askaipods "what are people saying about test-time compute"
+$ askaipods "when will AGI arrive" --days 30
 
-# askaipods · "what are people saying about test-time compute"
+# askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 1/20 daily*
+*Tier: member · Sort: recency · Results: 20 · Quota: 16/100 daily*
 
 ## Results — newest first
 
-### 1. The Data Exchange — This 150M Model Outperforms DeepSeek
-*2026-09-24* · https://www.youtube.com/watch?v=zoFYO4LxPcY · around 23:05: https://www.youtube.com/watch?v=zoFYO4LxPcY&t=1385s
+### 1. Sources with Alex Heath — Factory CEO on why AGI is already here
+*2026-09-29* · https://www.youtube.com/watch?v=IMxtXy2SnH0 · around 33:05: https://www.youtube.com/watch?v=IMxtXy2SnH0&t=1985s
 
-> Pathway currently runs on traditional GPUs; Susanna did not claim CPU
-> inference, but said edge-computing companies 'started knocking on our
-> doors' after the benchmark was published.
+> Matan believes AGI is already here and that we are living in a 'post-AGI
+> world.' So far nothing is 'crazy and scary,' though problems remain to be
+> solved.
 
-### 2. Machine Learning Street Talk — The AI That Replaces Hours of Model Tuning - Frank Hutter
-*2026-09-23* · https://www.youtube.com/watch?v=72Im-Mm5JKs
+### 2. The Cognitive Revolution — Obsolete or Irreplaceable? Garrison Lovely on Stopping the Race to Replace Human Labor
+*2026-09-29* · https://www.youtube.com/watch?v=PiBNrW7Q_Ws · around 31:20: https://www.youtube.com/watch?v=PiBNrW7Q_Ws&t=1880s
 
-> Harness modes such as 'scaling mode' and 'thinking mode' use test-time
-> compute to handle larger and more complex data (Frank).
+> Lovely's position is not that AGI should never be built, but that it should
+> only happen with strong public buy-in and scientific consensus that it can
+> be done safely (Lovely).
 
-(...18 more results, newest-first...)
+### 3. Sources with Alex Heath — Factory CEO on why AGI is already here
+*2026-09-29* · https://www.youtube.com/watch?v=IMxtXy2SnH0 · around 33:35: https://www.youtube.com/watch?v=IMxtXy2SnH0&t=2015s
+
+> Matan says he believes we are already 'past that event horizon' of AGI and
+> that work remains on things that might become 'crazy and scary' so that
+> nothing bad happens. He calls these 'the most fun problems to be working on.'
+
+### 4. The a16z Show — How Jev Turns AI Into Software That Gets Things Done
+*2026-09-28* · https://www.youtube.com/watch?v=Ut3LOjKNJaE · around 19:50: https://www.youtube.com/watch?v=Ut3LOjKNJaE&t=1190s
+
+> Diego says, 'for nuanced reasons,' that we are not on a path to RSI
+> (recursive self-improvement), and still believes that, but thinks OpenAI's
+> AGI definition (automating most economically valuable work) is 'extremely
+> doable.'
+
+### 5. The Cognitive Revolution — AI:AM: What If It Works Too Well? Colluding Agents, $200M Safety Orgs, Virtual Cells Saturate at 2%
+*2026-09-27* · https://www.youtube.com/watch?v=WPHfPiz6kkk · around 40:50: https://www.youtube.com/watch?v=WPHfPiz6kkk&t=2450s
+
+> Geoffrey Irving has said superintelligence might arrive in two or three
+> years and has proposed slowing down. Nadeau said CG manages timeline
+> uncertainty with a portfolio of short- and long-payoff bets.
+
+(...15 more results, newest-first...)
 ```
+
+*Real output, captured 2026-10-02 with a member API key; `--days 30` matches the anonymous tier's 30-day window. Without a key the header reads `Tier: anonymous` with a 20/day quota, and the output ends with an anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 
@@ -41,7 +66,7 @@ Web search is bad at "what is the AI community thinking about X right now". You 
 npx askaipods "your query here"
 ```
 
-That's the entire install. `npx` checks the registry and runs the latest published version each time — unless askaipods is also installed in the current project or globally, in which case that copy runs (update it with `npm install -g askaipods@latest`). No global install needed.
+That's the entire install. `npx` checks the registry and runs the latest published version each time — unless askaipods is also installed in the current project or globally, in which case that copy runs (update a project install with `npm install askaipods@latest`, a global one with `npm install -g askaipods@latest`). No global install needed.
 
 To install globally (faster startup):
 
@@ -66,7 +91,7 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 | Hermes Agent | `~/.hermes/skills/askaipods/` | [examples/hermes-install.md](examples/hermes-install.md) |
 | Any other agentskills.io-compatible runtime | per runtime docs | follow the agentskills.io standard — copy `skill/askaipods/` into your agent's skills directory |
 
-**Per-runtime paths matter**: Codex CLI documents `~/.agents/skills/` as its user-level location (per the [official Codex skills docs](https://developers.openai.com/codex/skills); earlier releases read `~/.codex/skills/`) — the same directory OpenClaw reads as personal agent skills, so one install there serves both. Project-scoped skills live under `.agents/skills/` in the repository. Claude Code and Hermes each read their own directory (table above).
+**Per-runtime paths matter**: Codex CLI documents `~/.agents/skills/` as its user-level location (per the [official Codex skills docs](https://learn.chatgpt.com/docs/build-skills); earlier releases read `~/.codex/skills/`) — the same directory OpenClaw reads as personal agent skills, so one install there serves both. Project-scoped skills live under `.agents/skills/` in the repository. Claude Code and Hermes each read their own directory (table above).
 
 The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout follows how the server selected the results — relevance-selected results (a member with `--sort relevance`) render **Latest 5** + **Top 5 Most Relevant** + **Insights**; recency-selected results (anonymous, free, and member by default) render **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for them because the API returns results sorted by date, not by semantic relevance).
 
@@ -97,7 +122,7 @@ askaipods "history of RLHF" --sort relevance
 
 Once the skill is installed in your agent's skills directory, simply ask:
 
-> What are people saying about test-time compute on AI podcasts?
+> Are coding agents replacing software engineers? What are people saying on AI podcasts?
 
 Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout follows the served ordering: **relevance-selected** results (a member with `--sort relevance`) render dual sections (Latest 5 + Top 5 Most Relevant + Insights); **recency-selected** results (anonymous, free, and member by default) render a single section (Recent Quotes + Insights), because they are sorted by date (not semantic relevance) and showing a "Top Relevant" view would be misleading. The agent asks for relevance when the question calls for it ("strongest argument", "history of") and tells the user when the tier served recency instead. No CLI knowledge required from the user either way.
 
@@ -106,13 +131,13 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | | Anonymous (default) | Free | Member |
 |---|---|---|---|
 | **Daily quota** | 20 searches per IP | 50 searches per user | 100 searches per user |
-| **Results returned** | The 20 newest of the ~60 most similar (API returns newest-first; `api_rank` = temporal order) | Same as anonymous | Same by default; with `--sort relevance`, the top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
+| **Results returned** | The 20 newest of the most similar matches (up to 60 per searched window; API returns newest-first; `api_rank` = temporal order) | Same as anonymous | Same by default; with `--sort relevance`, the top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text | Full text |
 | **`--days` cap (omitted = the cap)** | 30 days | 90 days | 365 days |
 | **Setup** | Nothing | Sign in free at https://podlens.net (Google or GitHub), then set `ASKAIPODS_API_KEY` to the account's API key | `ASKAIPODS_API_KEY` with a member key |
 | **Access** | n/a | Open sign-up | Granted by PodLens; paid-membership waitlist at https://podlens.net/dashboard?source=askaipods#waitlist |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. A free sign-in raises the quota to 50/day and the lookback to 90 days. Member access (100/day, 365-day lookback, relevance ordering) is not open for sign-up: free users can join the paid-membership waitlist on the dashboard, which records interest in a future paid tier — joining does not grant membership, and no timeline is promised. When today's free-tier capacity is used up, a free search still runs at the anonymous level (30 days, 20/day per IP) and the output says so (`downgraded`).
+The anonymous tier exists so you can try the skill end-to-end with zero setup. A free sign-in raises the quota to 50/day and the lookback to 90 days. Member access (100/day, 365-day lookback, relevance ordering) is not open for sign-up: free users can join the paid-membership waitlist on the dashboard, which records interest in a future paid tier — joining does not grant membership, and no timeline is promised. When today's free-tier capacity is used up, a free user who still has quota of their own is served at the anonymous level instead (30 days, counted against the IP's 20/day) and the output says so (`downgraded`); a user who has used all 50 of their own searches gets the ordinary quota-exhausted error.
 
 ## Honest limitations
 
@@ -138,7 +163,7 @@ For relevance-selected results (`render_hint: dual_view` — a member with `--so
 
 ```markdown
 ## 🆕 Latest 5
-(5 most recent of the 20 returned results)
+(5 most recent of the up to 20 returned results)
 
 ## 🎯 Top 5 Most Relevant
 (5 results with the lowest api_rank, regardless of date)

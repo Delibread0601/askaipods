@@ -1,17 +1,17 @@
 # Install askaipods in OpenClaw
 
-[OpenClaw](https://github.com/openclaw/openclaw) is [agentskills.io](https://agentskills.io)-compatible. Per the [official docs](https://docs.openclaw.ai/tools/skills), it loads skills from four locations with this precedence (highest first):
+[OpenClaw](https://github.com/openclaw/openclaw) is [agentskills.io](https://agentskills.io)-compatible. Per the [official docs](https://docs.openclaw.ai/tools/skills), it loads skills from several locations; the four that matter for installing askaipods, in precedence order (highest first), are:
 
 1. `<workspace>/skills/` — workspace skills (highest)
 2. `<workspace>/.agents/skills/` — project agent skills
 3. `~/.agents/skills/` — personal agent skills
 4. `~/.openclaw/skills/` — managed/local skills (shared across all agents on the machine)
 
-> **Note**: `~/.agents/skills/` (location 3) is also the user-level location OpenAI Codex CLI documents ([official Codex skills docs](https://developers.openai.com/codex/skills)), so an install there serves both runtimes (see [examples/codex-install.md](codex-install.md)).
+> **Note**: `~/.agents/skills/` (location 3) is also the user-level location OpenAI Codex CLI documents ([official Codex skills docs](https://learn.chatgpt.com/docs/build-skills)), so an install there serves both runtimes (see [examples/codex-install.md](codex-install.md)).
 
 ## Recommended install
 
-Install into the OpenClaw-native location (option 4 — lowest precedence, but stable across agent versions):
+Install into the OpenClaw-native location (option 4 — lowest precedence of the four, but stable across agent versions):
 
 ```bash
 git clone https://github.com/Delibread0601/askaipods.git ~/Code/askaipods
@@ -24,12 +24,6 @@ Or use the shared personal-skills location (option 3) if you want the skill visi
 ```bash
 mkdir -p ~/.agents/skills
 ln -s ~/Code/askaipods/skill/askaipods ~/.agents/skills/askaipods
-```
-
-Or use the OpenClaw CLI once askaipods is published to the ClawHub registry (not yet — check back, or open an issue to track):
-
-```bash
-openclaw skills install askaipods   # not yet available
 ```
 
 ## Workspace-only install
@@ -53,7 +47,7 @@ OpenClaw should recognize the trigger phrase, shell out to `npx -y askaipods sea
 
 ## Troubleshooting
 
-- **Skill not detected**: Restart the OpenClaw Gateway (`openclaw skills update` tracks ClawHub installs only, not this Git/copied install). Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
+- **Skill not detected**: OpenClaw watches skill folders and refreshes when `SKILL.md` changes; if the skill still does not appear, start a new session or restart the OpenClaw Gateway (`openclaw skills update` tracks ClawHub installs only, not this Git/copied install). Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
 - **`npx askaipods` fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
 - **Conflicting copies across precedence levels**: Only the highest-precedence one wins. If you have askaipods in both `~/.agents/skills/` and `<workspace>/skills/`, the workspace one takes effect.
 

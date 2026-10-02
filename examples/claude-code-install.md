@@ -33,17 +33,17 @@ In Claude Code, ask:
 
 You should see `askaipods` in the list. Or invoke it directly:
 
-> /askaipods test-time compute
+> /askaipods coding agents replacing software engineers
 
 Or trigger it organically:
 
-> What are people saying about test-time compute on AI podcasts?
+> Are coding agents replacing software engineers? What are people saying on AI podcasts?
 
 Claude Code should recognize the trigger phrase, run `npx -y askaipods search --format json -- "..."` (argv-style per SKILL.md's invocation rule), parse the response, and render the structured results per the SKILL.md template (the layout follows `render_hint`, i.e. the served ordering — relevance-selected results (a member with `--sort relevance`) show Latest + Top Relevant + Insights; recency-selected results (anonymous, free, and member by default) show Recent Quotes + Insights).
 
 ## Troubleshooting
 
-- **Skill not appearing**: Make sure the parent directory name matches the `name` field in `SKILL.md` (both must be `askaipods`).
+- **Skill not appearing**: Make sure `SKILL.md` sits directly in `~/.claude/skills/askaipods/` (or `.claude/skills/askaipods/`). Claude Code picks up new skills without a restart, but if the `skills` directory itself did not exist when the session started, run `/reload-skills`. Keep the directory name equal to the `name` field (`askaipods`), as the agentskills.io spec requires.
 - **`npx askaipods` fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The CLI uses zero dependencies so there are no other prereqs.
 - **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then `export ASKAIPODS_API_KEY=pk_xxx` with the account's API key for 50/day.
 - **Free quota exhausted (50/day)**: member access (100/day) is not open for sign-up; the paid-membership waitlist is at https://podlens.net/dashboard?source=askaipods#waitlist — joining records interest and does not grant membership.
