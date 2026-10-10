@@ -160,6 +160,17 @@ describe("toStructured — three-tier server (access_tier / sort / downgraded)",
     assert.equal(toStructured("q", env({ access_tier: "anonymous" })).downgraded, null);
   });
 
+  test("downgraded with reason new_account passes through unchanged", () => {
+    const downgraded = {
+      from: "free",
+      reason: "new_account",
+      waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
+    };
+    const s = toStructured("q", env({ access_tier: "anonymous", downgraded }));
+    assert.deepEqual(s.downgraded, downgraded);
+    assert.equal(s.tier, "anonymous");
+  });
+
   test("top-level key order: tier, query, fetched_at, render_hint, sort, downgraded, results, meta", () => {
     assert.deepEqual(Object.keys(toStructured("q", env({}))), [
       "tier", "query", "fetched_at", "render_hint", "sort", "downgraded", "results", "meta",

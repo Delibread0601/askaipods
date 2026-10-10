@@ -197,6 +197,36 @@ describe("v0.3.0 — three tiers, --sort, degrade notice", () => {
   });
 });
 
+describe("v0.3.2 — new-account probation and the anonymous-level capacity 503", () => {
+  test("SKILL.md branches the degrade field and banner on downgraded.reason", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /`"new_account"` — free accounts search at the anonymous level for their first 48 hours/);
+    assert.match(body, /`"free_pool_exhausted"` — today's free-tier capacity is used up/);
+    assert.match(body, /`"new_account"` → `\*Note: New free accounts search at the anonymous level for their first 48 hours/);
+    assert.match(body, /`"free_pool_exhausted"` → `\*Note: Today's free-tier capacity is used up/);
+    assert.match(body, /any other value → `\*Note: This search ran at the anonymous level/);
+  });
+
+  test("SKILL.md, README and install guides qualify the 50/day free tier with the 48-hour probation", () => {
+    const skill = read("skill/askaipods/SKILL.md");
+    assert.match(skill, /50\/day free tier .* once the account is 48 hours old/);
+    assert.match(skill, /for 50 searches\/day and `--days` up to 90 once the account is 48 hours old/);
+    const readme = read("README.md");
+    assert.match(readme, /\| 50 searches per user \(anonymous level for the account's first 48 hours\) \|/);
+    assert.match(readme, /50\/day and the lookback to 90 days once the account is 48 hours old/);
+    for (const p of ["examples/claude-code-install.md", "examples/hermes-install.md"]) {
+      assert.match(read(p), /50\/day \(a new account searches at the anonymous level for its first 48 hours\)/, p);
+    }
+    assert.match(read("src/cli.js"), /account searches at the anonymous level for its\s+first 48 hours/);
+  });
+
+  test("exit 2 covers the daily capacity in SKILL.md, README and --help", () => {
+    assert.match(read("skill/askaipods/SKILL.md"), /\| `2` \| Daily quota exhausted, or podlens\.net's daily anonymous-level capacity reached \| Do not retry at the same tier before 00:00 UTC/);
+    assert.match(read("README.md"), /\| `2` \| Daily quota exhausted, or podlens\.net's daily capacity for anonymous-level searches reached/);
+    assert.match(read("src/cli.js"), /2  daily quota exhausted, or podlens\.net's daily anonymous-level capacity/);
+  });
+});
+
 describe("v0.2.9 — corpus scope matches PodLens (AI-centred, five domains)", () => {
   // The corpus is centred on AI but also covers venture capital, global
   // markets & finance, semiconductors & compute, and tech policy &

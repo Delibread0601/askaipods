@@ -45,7 +45,7 @@ Claude Code should recognize the trigger phrase, run `npx -y askaipods search --
 
 - **Skill not appearing**: Make sure `SKILL.md` sits directly in `~/.claude/skills/askaipods/` (or `.claude/skills/askaipods/`). Claude Code picks up new skills without a restart, but if the `skills` directory itself did not exist when the session started, run `/reload-skills`. Keep the directory name equal to the `name` field (`askaipods`), as the agentskills.io spec requires.
 - **`npx askaipods` fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The CLI uses zero dependencies so there are no other prereqs.
-- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then `export ASKAIPODS_API_KEY=pk_xxx` with the account's API key for 50/day.
+- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then `export ASKAIPODS_API_KEY=pk_xxx` with the account's API key for 50/day (a new account searches at the anonymous level for its first 48 hours).
 - **Free quota exhausted (50/day)**: member access (100/day) is not open for sign-up; the paid-membership waitlist is at https://podlens.net/dashboard?source=askaipods#waitlist — joining records interest and does not grant membership.
 - **Skill triggers too rarely**: Front-load your prompt with the trigger phrases in `SKILL.md` description, or invoke directly with `/askaipods <query>`.
 

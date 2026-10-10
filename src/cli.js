@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError, SORT_VALUES } from "./client.js";
 import { renderJson, renderMarkdown } from "./format.js";
 
-const VERSION = "0.3.1";
+const VERSION = "0.3.2";
 
 const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
 
@@ -36,7 +36,9 @@ ENVIRONMENT:
   ASKAIPODS_API_KEY          PodLens API key. Tiers:
                                anonymous (no key)   20 searches/day per IP, --days cap 30
                                free (account key)   50 searches/day per user, --days cap 90 — sign in free
-                                                    with Google or GitHub at https://podlens.net
+                                                    with Google or GitHub at https://podlens.net (a new
+                                                    account searches at the anonymous level for its
+                                                    first 48 hours)
                                member (member key)  100 searches/day per user, --days cap 365, --sort relevance;
                                                     granted by PodLens, not by sign-up (paid-membership
                                                     waitlist: https://podlens.net/dashboard?source=askaipods#waitlist)
@@ -44,8 +46,10 @@ ENVIRONMENT:
 EXIT CODES:
   0  success
   1  usage error / invalid arguments / API key rejected
-  2  daily quota exhausted (tier-aware message on stderr)
-  3  transient or unexpected failure — network / rate-limit burst / 503 /
+  2  daily quota exhausted, or podlens.net's daily anonymous-level capacity
+     reached — do not retry at the same tier before 00:00 UTC (tier-aware
+     message on stderr)
+  3  transient or unexpected failure — network / rate-limit burst / transient 503 /
      protocol error / internal exception (stderr has the actionable detail)
 
 EXAMPLES:

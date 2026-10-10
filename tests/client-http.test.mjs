@@ -188,6 +188,27 @@ describe("search — HTTP error → exit-code mapping", () => {
     assert.match(err.message, /temporarily unavailable/i);
   });
 
+  test("503 'Daily capacity reached' (no Retry-After) → exit 2, do-not-retry-until-reset copy", async () => {
+    mockResponse({ status: 503, body: { error: "Daily capacity reached. Please try again tomorrow." } });
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /daily capacity for anonymous-level searches is used up/);
+    assert.match(err.message, /resets at 00:00 UTC — retrying at the anonymous level before then will fail/);
+    assert.match(err.message, /shared by every caller served at the anonymous level, including free accounts in their first 48 hours/);
+    assert.doesNotMatch(err.message, /temporarily unavailable/i);
+  });
+
+  test("transient 503 (any other error text) stays exit 3", async () => {
+    mockResponse({
+      status: 503,
+      body: { error: "Service temporarily unavailable" },
+      headers: { "retry-after": "30" },
+    });
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 3);
+    assert.match(err.message, /temporarily unavailable/i);
+  });
+
   test("500 → exit 3 generic", async () => {
     mockResponse({ status: 500, body: { error: "boom" } });
     const err = await runAndCatch();
@@ -337,6 +358,53 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.match(err.message, /does not grant membership/);
     // A signed-in free user must not be told to sign in or that the key is wrong.
     assert.doesNotMatch(err.message, /sign in|served as anonymous|invite/i);
+  });
+
+  test("new server: new-account probation (reason new_account) → 48-hour copy, not pool-exhaustion copy", async () => {
+    mockResponse(
+      newServer429(
+        {
+          tier: "anonymous",
+          access_tier: "anonymous",
+          quota: { used: 20, limit: 20 },
+          downgraded: { from: "free", reason: "new_account", waitlist: "https://podlens.net/dashboard#waitlist" },
+        },
+        20,
+      ),
+    );
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /new free accounts search at the anonymous level — 20\/day per IP — for their first 48 hours/);
+    assert.match(err.message, /50 searches\/day apply once the account is 48 hours old/);
+    assert.match(err.message, /Quota resets at 00:00 UTC/);
+    assert.doesNotMatch(err.message, /capacity|waitlist|sign in|served as anonymous/i);
+  });
+
+  test("new server: unknown downgrade reason → neutral anonymous-level copy", async () => {
+    mockResponse(
+      newServer429(
+        {
+          tier: "anonymous",
+          access_tier: "anonymous",
+          quota: { used: 20, limit: 20 },
+          downgraded: { from: "free", reason: "maintenance", waitlist: "https://podlens.net/dashboard#waitlist" },
+        },
+        20,
+      ),
+    );
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /this request ran at the anonymous level — 20\/day per IP — and that quota is used up/);
+    assert.doesNotMatch(err.message, /capacity|48 hours|waitlist|sign in/i);
+  });
+
+  test("anonymous 429 qualifies the 50/day upsell with the 48-hour probation", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
+    const err = await runAndCatch();
+    assert.match(err.message, /new accounts search at the anonymous level for their first 48 hours/);
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
+    const keyed = await runAndCatch({ apiKey: "k1" });
+    assert.match(keyed.message, /50 searches\/day once the account is 48 hours old/);
   });
 
   test("429 without 'quota' in message → exit 3 rate-limit (not daily quota)", async () => {

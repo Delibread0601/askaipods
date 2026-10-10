@@ -716,15 +716,17 @@ describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sor
     });
   }
 
-  test("accepts downgraded {from, reason, waitlist}", async () => {
-    const downgraded = {
-      from: "free",
-      reason: "free_pool_exhausted",
-      waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
-    };
-    const data = await callSearch(validEnvelope({ meta: meta({ access_tier: "anonymous", downgraded }) }));
-    assert.deepEqual(data.meta.downgraded, downgraded);
-  });
+  for (const reason of ["free_pool_exhausted", "new_account", "some_future_reason"]) {
+    test(`accepts downgraded {from, reason, waitlist} with reason ${reason}`, async () => {
+      const downgraded = {
+        from: "free",
+        reason,
+        waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
+      };
+      const data = await callSearch(validEnvelope({ meta: meta({ access_tier: "anonymous", downgraded }) }));
+      assert.deepEqual(data.meta.downgraded, downgraded);
+    });
+  }
 
   for (const [bad, description] of [
     ["free", "string instead of object"],

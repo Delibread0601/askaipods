@@ -32,7 +32,7 @@ function tierNote(data) {
     return (
       `Anonymous tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
       "Sign in free with Google or GitHub at https://podlens.net and set ASKAIPODS_API_KEY to the account's " +
-      "API key for 50 searches/day and --days up to 90."
+      "API key for 50 searches/day and --days up to 90 once the account is 48 hours old."
     );
   }
   if (data.tier === "free") {
@@ -46,6 +46,28 @@ function tierNote(data) {
     );
   }
   return null;
+}
+
+// Degrade notice, by `downgraded.reason`: today's free-tier capacity is
+// used up, the account is inside its first 48 hours, or (a reason this
+// version does not know) a neutral statement of the level served.
+function downgradeNote(data) {
+  const d = data.downgraded;
+  if (!d) return null;
+  const level = `the anonymous level (--days cap ${capDays(data, 30)}, 20 searches/day per IP)`;
+  if (d.reason === "free_pool_exhausted") {
+    return (
+      `*Note: Today's ${d.from}-tier capacity is used up, so this search ran at ${level}. ` +
+      `Paid-membership waitlist: ${d.waitlist} (joining records interest; it does not grant membership).*`
+    );
+  }
+  if (d.reason === "new_account") {
+    return (
+      `*Note: New free accounts search at the anonymous level for their first 48 hours, so this search ran at ${level}. ` +
+      "The free tier (50 searches/day, --days up to 90) applies once the account is 48 hours old.*"
+    );
+  }
+  return `*Note: This search ran at ${level} instead of the ${d.from} tier (reason: ${d.reason}).*`;
 }
 
 // Seconds → "m:ss" / "h:mm:ss" for the approximate-timestamp label.
@@ -139,7 +161,9 @@ export function toStructured(query, response) {
     // predate the field.
     sort,
     // { from, reason, waitlist } when a free request ran at the anonymous
-    // level because today's free-tier capacity was used up; else null.
+    // level (reason "free_pool_exhausted": today's free-tier capacity is
+    // used up; "new_account": the account is younger than 48 hours); else
+    // null.
     downgraded: response.meta.downgraded ?? null,
     results: sorted.map((r) => ({
       podcast: r.podcast_name ?? null,
@@ -215,15 +239,12 @@ export function renderMarkdown(query, response) {
   lines.push(`*Tier: ${tierLabel}${sortLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
   lines.push("");
 
-  // Degrade notice: a free request ran at the anonymous level because
-  // today's free-tier capacity was used up. Shown before every other
-  // note — it explains the tier, cap and quota in the header.
-  if (data.downgraded) {
-    lines.push(
-      `*Note: Today's ${data.downgraded.from}-tier capacity is used up, so this search ran at the anonymous level ` +
-        `(--days cap ${capDays(data, 30)}, 20 searches/day per IP). Paid-membership waitlist: ${data.downgraded.waitlist} ` +
-        "(joining records interest; it does not grant membership).*",
-    );
+  // Degrade notice: a free request ran at the anonymous level. Shown
+  // before every other note — it explains the tier, cap and quota in the
+  // header.
+  const degradeNote = downgradeNote(data);
+  if (degradeNote) {
+    lines.push(degradeNote);
     lines.push("");
   }
 

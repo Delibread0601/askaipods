@@ -3,54 +3,57 @@
 > Search podcast quotes about AI and tech investing — recent episode excerpts from 70+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), surfaced as short indexed quotes (no per-speaker attribution). A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
-$ askaipods "when will AGI arrive" --days 30
+$ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: member · Sort: recency · Results: 20 · Quota: 16/100 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 4/20 daily*
 
 ## Results — newest first
 
-### 1. Sources with Alex Heath — Factory CEO on why AGI is already here
-*2026-09-29* · https://www.youtube.com/watch?v=IMxtXy2SnH0 · around 33:05: https://www.youtube.com/watch?v=IMxtXy2SnH0&t=1985s
+### 1. The Cognitive Revolution — AI:AM: A Level We Shouldn't Pass? Notes from The Curve + Tokens vs. Salaries & Is SaaS Cooked?
+*2026-10-08* · https://www.youtube.com/watch?v=g_K9pqbQJwU · around 17:20: https://www.youtube.com/watch?v=g_K9pqbQJwU&t=1040s
 
-> Matan believes AGI is already here and that we are living in a 'post-AGI
-> world.' So far nothing is 'crazy and scary,' though problems remain to be
-> solved.
+> Prakash said Elon Musk is betting that infrastructure matters more than
+> models and is planning for 2029-2031 (terawatt-scale efforts, SpaceX
+> satellites in the 2030s), while Anthropic and OpenAI are planning for a
+> two-to-three-year horizon, with AGI/RSI around 2028-2029 (Prakash).
 
-### 2. The Cognitive Revolution — Obsolete or Irreplaceable? Garrison Lovely on Stopping the Race to Replace Human Labor
-*2026-09-29* · https://www.youtube.com/watch?v=PiBNrW7Q_Ws · around 31:20: https://www.youtube.com/watch?v=PiBNrW7Q_Ws&t=1880s
+### 2. ChinaTalk — Washington is AGI-Pilled | Kevin Roose
+*2026-10-08* · https://www.youtube.com/watch?v=e8NQczdKrks · around 55:50: https://www.youtube.com/watch?v=e8NQczdKrks&t=3350s
 
-> Lovely's position is not that AGI should never be built, but that it should
-> only happen with strong public buy-in and scientific consensus that it can
-> be done safely (Lovely).
+> Roose said the story he cares most about now is recursive self-improvement
+> and whether an intelligence explosion arrives in 2027, which serious
+> people now tell him could happen, including full automation of AI R&D next
+> year.
 
-### 3. Sources with Alex Heath — Factory CEO on why AGI is already here
-*2026-09-29* · https://www.youtube.com/watch?v=IMxtXy2SnH0 · around 33:35: https://www.youtube.com/watch?v=IMxtXy2SnH0&t=2015s
+### 3. ChinaTalk — Washington is AGI-Pilled | Kevin Roose
+*2026-10-08* · https://www.youtube.com/watch?v=e8NQczdKrks · around 58:35: https://www.youtube.com/watch?v=e8NQczdKrks&t=3515s
 
-> Matan says he believes we are already 'past that event horizon' of AGI and
-> that work remains on things that might become 'crazy and scary' so that
-> nothing bad happens. He calls these 'the most fun problems to be working on.'
+> Jordan predicted that if AI doubles in capability every month or so,
+> developed societies will reject an industrial-revolution-scale shock over
+> five years and a political 'just say no' response will gain momentum;
+> Roose mentioned a 'Butlerian Jihad' as possible.
 
-### 4. The a16z Show — How Jev Turns AI Into Software That Gets Things Done
-*2026-09-28* · https://www.youtube.com/watch?v=Ut3LOjKNJaE · around 19:50: https://www.youtube.com/watch?v=Ut3LOjKNJaE&t=1190s
+### 4. The Cognitive Revolution — AI:AM: A Level We Shouldn't Pass? Notes from The Curve + Tokens vs. Salaries & Is SaaS Cooked?
+*2026-10-08* · https://www.youtube.com/watch?v=g_K9pqbQJwU · around 22:20: https://www.youtube.com/watch?v=g_K9pqbQJwU&t=1340s
 
-> Diego says, 'for nuanced reasons,' that we are not on a path to RSI
-> (recursive self-improvement), and still believes that, but thinks OpenAI's
-> AGI definition (automating most economically valuable work) is 'extremely
-> doable.'
+> Insiders repeatedly said they expect to be bottlenecked on safety and
+> alignment, but that enough low-hanging fruit (such as fixing RL
+> environments) remains to release the next one or two generations
+> comfortably; beyond that, 'all bets are off' (host).
 
-### 5. The Cognitive Revolution — AI:AM: What If It Works Too Well? Colluding Agents, $200M Safety Orgs, Virtual Cells Saturate at 2%
-*2026-09-27* · https://www.youtube.com/watch?v=WPHfPiz6kkk · around 40:50: https://www.youtube.com/watch?v=WPHfPiz6kkk&t=2450s
+### 5. Pioneers of AI — OpenAI’s Tibo Sottiaux doesn’t want humans to be an ‘afterthought’
+*2026-10-07* · https://www.youtube.com/watch?v=rzh4uC2-SqU
 
-> Geoffrey Irving has said superintelligence might arrive in two or three
-> years and has proposed slowing down. Nadeau said CG manages timeline
-> uncertainty with a portfolio of short- and long-payoff bets.
+> Sotio said there is no clear definition of AGI, but predicted that in a
+> couple of years people will point to roughly this period as when it was
+> achieved.
 
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-10-02 with a member API key; `--days 30` matches the anonymous tier's 30-day window. Without a key the header reads `Tier: anonymous` with a 20/day quota, and the output ends with an anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-10-10 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 
@@ -110,7 +113,8 @@ askaipods "Anthropic safety research" --format json
 # --days caps: anonymous 30, free 90, member 365)
 askaipods "GPU shortage" --days 30
 
-# Use an API key: a free account's key for 50/day, a member key for 100/day (anonymous: 20/day)
+# Use an API key: a free account's key for 50/day (anonymous level for the account's first 48 hours),
+# a member key for 100/day (anonymous: 20/day)
 ASKAIPODS_API_KEY=pk_xxx askaipods "your query"
 askaipods "your query" --api-key pk_xxx
 
@@ -130,14 +134,14 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 
 | | Anonymous (default) | Free | Member |
 |---|---|---|---|
-| **Daily quota** | 20 searches per IP | 50 searches per user | 100 searches per user |
+| **Daily quota** | 20 searches per IP | 50 searches per user (anonymous level for the account's first 48 hours) | 100 searches per user |
 | **Results returned** | The 20 newest of the most similar matches (up to 60 per searched window; API returns newest-first; `api_rank` = temporal order) | Same as anonymous | Same by default; with `--sort relevance`, the top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text | Full text |
 | **`--days` cap (omitted = the cap)** | 30 days | 90 days | 365 days |
 | **Setup** | Nothing | Sign in free at https://podlens.net (Google or GitHub), then set `ASKAIPODS_API_KEY` to the account's API key | `ASKAIPODS_API_KEY` with a member key |
 | **Access** | n/a | Open sign-up | Granted by PodLens; paid-membership waitlist at https://podlens.net/dashboard?source=askaipods#waitlist |
 
-The anonymous tier exists so you can try the skill end-to-end with zero setup. A free sign-in raises the quota to 50/day and the lookback to 90 days. Member access (100/day, 365-day lookback, relevance ordering) is not open for sign-up: free users can join the paid-membership waitlist on the dashboard, which records interest in a future paid tier — joining does not grant membership, and no timeline is promised. When today's free-tier capacity is used up, a free user who still has quota of their own is served at the anonymous level instead (30 days, counted against the IP's 20/day) and the output says so (`downgraded`); a user who has used all 50 of their own searches gets the ordinary quota-exhausted error.
+The anonymous tier exists so you can try the skill end-to-end with zero setup. A free sign-in raises the quota to 50/day and the lookback to 90 days once the account is 48 hours old; until then the account searches at the anonymous level (30 days, counted against the IP's 20/day) and the output says so (`downgraded`, reason `new_account`). Member access (100/day, 365-day lookback, relevance ordering) is not open for sign-up: free users can join the paid-membership waitlist on the dashboard, which records interest in a future paid tier — joining does not grant membership, and no timeline is promised. When today's free-tier capacity is used up, a free user who still has quota of their own is served at the anonymous level instead (30 days, counted against the IP's 20/day) and the output says so (`downgraded`, reason `free_pool_exhausted`); a user who has used all 50 of their own searches gets the ordinary quota-exhausted error.
 
 ## Honest limitations
 
@@ -154,8 +158,8 @@ These are not bugs. The skill surfaces them honestly so neither you nor your age
 |---|---|
 | `0` | Success |
 | `1` | Usage error / invalid arguments / API key rejected |
-| `2` | Daily quota exhausted |
-| `3` | Transient or unexpected failure — network error, rate-limit burst, service 503, protocol/shape error, or internal exception. stderr has the actionable detail. |
+| `2` | Daily quota exhausted, or podlens.net's daily capacity for anonymous-level searches reached. Retrying at the same tier before 00:00 UTC will fail. |
+| `3` | Transient or unexpected failure — network error, rate-limit burst, transient service 503, protocol/shape error, or internal exception. stderr has the actionable detail. |
 
 ## How the skill renders results
 

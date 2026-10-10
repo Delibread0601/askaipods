@@ -2,7 +2,8 @@
 //
 // Lives in its own file so the CLI layer never has to know about HTTP
 // or status codes — it gets back either a parsed response object or a
-// thrown error carrying a stable exitCode (1=usage, 2=quota, 3=network).
+// thrown error carrying a stable exitCode (1=usage, 2=quota or daily
+// capacity, 3=network / transient).
 // That separation lets the test suite mock the network at this seam
 // instead of patching `fetch` globally.
 
@@ -303,18 +304,32 @@ function isValidSuccessEnvelope(data) {
 
 // Daily-quota (429) copy. Tier source, strongest first: the 429
 // envelope's `meta.downgraded` (a free request served at the anonymous
-// level because today's free-tier capacity ran out), then its
-// `meta.access_tier`, then — for servers that send neither — the
-// X-RateLimit-Limit header naming the quota that was actually applied
-// (20 / 50 / 100), then whether a key was sent.
+// level — today's free-tier capacity ran out, or the account is younger
+// than 48 hours), then its `meta.access_tier`, then — for servers that
+// send neither — the X-RateLimit-Limit header naming the quota that was
+// actually applied (20 / 50 / 100), then whether a key was sent.
 function quotaExhaustedMessage(meta, limitHeader, apiKey) {
   const reset = "Quota resets at 00:00 UTC.";
   if (isPlainObject(meta?.downgraded)) {
-    const waitlist = typeof meta.downgraded.waitlist === "string" ? meta.downgraded.waitlist : WAITLIST_URL;
+    const reason = meta.downgraded.reason;
+    if (reason === "new_account") {
+      return (
+        "daily search quota exhausted (new free accounts search at the anonymous level — 20/day per IP — " +
+        `for their first 48 hours, and that quota is used up). ${reset} ` +
+        "The free tier's 50 searches/day apply once the account is 48 hours old."
+      );
+    }
+    if (reason === "free_pool_exhausted") {
+      const waitlist = typeof meta.downgraded.waitlist === "string" ? meta.downgraded.waitlist : WAITLIST_URL;
+      return (
+        "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
+        `anonymous level — 20/day per IP — and that quota is used too). ${reset} ` +
+        `Paid-membership waitlist: ${waitlist} (joining records interest; it does not grant membership).`
+      );
+    }
     return (
-      "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
-      `anonymous level — 20/day per IP — and that quota is used too). ${reset} ` +
-      `Paid-membership waitlist: ${waitlist} (joining records interest; it does not grant membership).`
+      "daily search quota exhausted (this request ran at the anonymous level — 20/day per IP — " +
+      `and that quota is used up). ${reset}`
     );
   }
   let tier = ACCESS_TIERS.has(meta?.access_tier) ? meta.access_tier : null;
@@ -338,13 +353,30 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
   if (apiKey) {
     return (
       `daily search quota exhausted (anonymous tier: 20/day per IP — this API key was served as anonymous). ${reset} ` +
-      "Sign in at https://podlens.net and set ASKAIPODS_API_KEY to the API key shown on the dashboard for 50 searches/day."
+      "Sign in at https://podlens.net and set ASKAIPODS_API_KEY to the API key shown on the dashboard " +
+      "for 50 searches/day once the account is 48 hours old."
     );
   }
   return (
     `daily search quota exhausted (anonymous tier: 20/day per IP). ${reset} ` +
     "For 50 searches/day, sign in free with Google or GitHub at https://podlens.net " +
-    "and set ASKAIPODS_API_KEY to the account's API key."
+    "and set ASKAIPODS_API_KEY to the account's API key (new accounts search at the anonymous level " +
+    "for their first 48 hours)."
+  );
+}
+
+// The server's site-wide anonymous-level pool (shared by anonymous callers
+// and by free callers served at the anonymous level) answers exhaustion
+// with 503 and this error text, without Retry-After — unlike its transient
+// 503s, which carry Retry-After: 30. It lasts until the UTC day rolls over,
+// so it maps to exit 2 (stop for today), not exit 3 (retry).
+const CAPACITY_REACHED = /daily capacity reached/i;
+
+function capacityReachedMessage() {
+  return (
+    "podlens.net's daily capacity for anonymous-level searches is used up (shared by every caller served at the " +
+    "anonymous level, including free accounts in their first 48 hours). It resets at 00:00 UTC — retrying at the " +
+    "anonymous level before then will fail. Searches served at the free or member level are not affected."
   );
 }
 
@@ -358,7 +390,7 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.3.1 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.3.2 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;
@@ -477,6 +509,9 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
   }
 
   if (response.status === 503) {
+    if (CAPACITY_REACHED.test(String(data?.error ?? ""))) {
+      throw exitErr(2, capacityReachedMessage());
+    }
     throw exitErr(3, `podlens.net temporarily unavailable: ${data?.error ?? "service unavailable"}`);
   }
 

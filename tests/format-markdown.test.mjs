@@ -281,6 +281,39 @@ describe("renderMarkdown — three-tier server (0.3.0)", () => {
       assert.doesNotMatch(out, /Anonymous tier|Sign in free/);
     }
   });
+
+  test("new-account probation (reason new_account): 48-hour notice, no pool-exhaustion copy, no sign-in note", () => {
+    const env = nonEmpty(
+      meta3({
+        access_tier: "anonymous",
+        restrictions: { max_days: 30 },
+        downgraded: { from: "free", reason: "new_account", waitlist: "https://podlens.net/dashboard#waitlist" },
+      }),
+    );
+    for (const out of [renderMarkdown("q", env), renderMarkdown("q", empty(env.meta))]) {
+      assert.match(out, /New free accounts search at the anonymous level for their first 48 hours, so this search ran at the anonymous level \(--days cap 30, 20 searches\/day per IP\)/);
+      assert.match(out, /The free tier \(50 searches\/day, --days up to 90\) applies once the account is 48 hours old/);
+      assert.doesNotMatch(out, /capacity is used up|waitlist|Anonymous tier|Sign in free/i);
+    }
+  });
+
+  test("unknown downgrade reason: neutral anonymous-level notice naming the reason", () => {
+    const env = nonEmpty(
+      meta3({
+        access_tier: "anonymous",
+        restrictions: { max_days: 30 },
+        downgraded: { from: "free", reason: "maintenance", waitlist: "https://podlens.net/dashboard#waitlist" },
+      }),
+    );
+    const out = renderMarkdown("q", env);
+    assert.match(out, /This search ran at the anonymous level \(--days cap 30, 20 searches\/day per IP\) instead of the free tier \(reason: maintenance\)/);
+    assert.doesNotMatch(out, /capacity is used up|48 hours|waitlist|Anonymous tier|Sign in free/i);
+  });
+
+  test("anonymous tier note qualifies the 50/day upsell with the 48-hour probation", () => {
+    const out = renderMarkdown("q", nonEmpty(meta3({ access_tier: "anonymous" })));
+    assert.match(out, /50 searches\/day and --days up to 90 once the account is 48 hours old/);
+  });
 });
 
 describe("renderMarkdown — non-empty freshness banner (R2-03, R6-01)", () => {
