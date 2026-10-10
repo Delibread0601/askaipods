@@ -308,14 +308,27 @@ function isValidSuccessEnvelope(data) {
 // than 48 hours), then its `meta.access_tier`, then — for servers that
 // send neither — the X-RateLimit-Limit header naming the quota that was
 // actually applied (20 / 50 / 100), then whether a key was sent.
+//
+// The anonymous level has two caps: 20/day per IP and, for IPv6 callers,
+// 200/day across the whole /48 network (podlens-site
+// ANON_V6_SITE_DAILY_LIMIT). Both answer the same 429; only the binding
+// limit — `meta.quota.limit`, else X-RateLimit-Limit — tells them apart.
+const ANON_V6_NETWORK_DAILY_LIMIT = 200;
+
 function quotaExhaustedMessage(meta, limitHeader, apiKey) {
   const reset = "Quota resets at 00:00 UTC.";
+  const limit =
+    isPlainObject(meta?.quota) && typeof meta.quota.limit === "number" ? meta.quota.limit : Number(limitHeader);
+  const network = limit === ANON_V6_NETWORK_DAILY_LIMIT;
+  const level = network ? "20/day per IP, 200/day per IPv6 /48 network" : "20/day per IP";
+  const usedUp = network ? "the network's shared 200/day is used up" : "that quota is used up";
+  const anonTier = network ? `${level}; ${usedUp}` : level;
   if (isPlainObject(meta?.downgraded)) {
     const reason = meta.downgraded.reason;
     if (reason === "new_account") {
       return (
-        "daily search quota exhausted (new free accounts search at the anonymous level — 20/day per IP — " +
-        `for their first 48 hours, and that quota is used up). ${reset} ` +
+        `daily search quota exhausted (new free accounts search at the anonymous level — ${level} — ` +
+        `for their first 48 hours, and ${usedUp}). ${reset} ` +
         "The free tier's 50 searches/day apply once the account is 48 hours old."
       );
     }
@@ -323,18 +336,19 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
       const waitlist = typeof meta.downgraded.waitlist === "string" ? meta.downgraded.waitlist : WAITLIST_URL;
       return (
         "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
-        `anonymous level — 20/day per IP — and that quota is used too). ${reset} ` +
+        `anonymous level — ${level} — and ${usedUp} too). ${reset} ` +
         `Paid-membership waitlist: ${waitlist} (joining records interest; it does not grant membership).`
       );
     }
     return (
-      "daily search quota exhausted (this request ran at the anonymous level — 20/day per IP — " +
-      `and that quota is used up). ${reset}`
+      `daily search quota exhausted (this request ran at the anonymous level — ${level} — ` +
+      `and ${usedUp}). ${reset}`
     );
   }
   let tier = ACCESS_TIERS.has(meta?.access_tier) ? meta.access_tier : null;
   if (!tier) {
     if (limitHeader) {
+      // Any other value — 20, or the /48 allowance's 200 — is the anonymous level.
       tier = limitHeader === "100" ? "member" : limitHeader === "50" ? "free" : "anonymous";
     } else {
       tier = apiKey ? "member" : "anonymous";
@@ -352,13 +366,13 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
   }
   if (apiKey) {
     return (
-      `daily search quota exhausted (anonymous tier: 20/day per IP — this API key was served as anonymous). ${reset} ` +
+      `daily search quota exhausted (anonymous tier: ${anonTier} — this API key was served as anonymous). ${reset} ` +
       "Sign in at https://podlens.net and set ASKAIPODS_API_KEY to the API key shown on the dashboard " +
       "for 50 searches/day once the account is 48 hours old."
     );
   }
   return (
-    `daily search quota exhausted (anonymous tier: 20/day per IP). ${reset} ` +
+    `daily search quota exhausted (anonymous tier: ${anonTier}). ${reset} ` +
     "For 50 searches/day, sign in free with Google or GitHub at https://podlens.net " +
     "and set ASKAIPODS_API_KEY to the account's API key (new accounts search at the anonymous level " +
     "for their first 48 hours)."
@@ -390,7 +404,7 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
 
   const headers = {
     "Content-Type": "application/json",
-    "User-Agent": "askaipods/0.3.2 (+https://github.com/Delibread0601/askaipods)",
+    "User-Agent": "askaipods/0.3.3 (+https://github.com/Delibread0601/askaipods)",
   };
   if (apiKey) {
     headers["X-PodLens-API-Key"] = apiKey;

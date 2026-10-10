@@ -407,6 +407,79 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.match(keyed.message, /50 searches\/day once the account is 48 hours old/);
   });
 
+  // IPv6 /48 aggregate: same 429 text and access_tier "anonymous", but the
+  // binding limit is the network's 200/day, not the IP's 20/day.
+  const NETWORK_COPY = /20\/day per IP, 200\/day per IPv6 \/48 network/;
+  const NETWORK_USED = /the network's shared 200\/day is used up/;
+  const PER_IP_ONLY = /20\/day per IP\)|20\/day per IP —|that quota is used/;
+
+  test("/48 allowance, no key → network copy with the free sign-in path, no per-IP claim", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 200));
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /anonymous tier: 20\/day per IP, 200\/day per IPv6 \/48 network; the network's shared 200\/day is used up\)/);
+    assert.match(err.message, /sign in free with Google or GitHub at https:\/\/podlens\.net/);
+    assert.doesNotMatch(err.message, PER_IP_ONLY);
+  });
+
+  test("/48 allowance, key served as anonymous → network copy naming the key", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 200));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, NETWORK_COPY);
+    assert.match(err.message, NETWORK_USED);
+    assert.match(err.message, /this API key was served as anonymous/);
+    assert.doesNotMatch(err.message, PER_IP_ONLY);
+  });
+
+  for (const [reason, expected] of [
+    ["new_account", /for their first 48 hours, and the network's shared 200\/day is used up\)/],
+    ["free_pool_exhausted", /free-tier capacity is used up.*the network's shared 200\/day is used up too\)/],
+    ["maintenance", /this request ran at the anonymous level — 20\/day per IP, 200\/day per IPv6 \/48 network — and the network's shared 200\/day is used up\)/],
+  ]) {
+    test(`/48 allowance, downgraded (${reason}) → network copy in the downgrade branch`, async () => {
+      mockResponse(
+        newServer429(
+          {
+            tier: "anonymous",
+            access_tier: "anonymous",
+            quota: { used: 200, limit: 200 },
+            downgraded: { from: "free", reason, waitlist: "https://podlens.net/dashboard#waitlist" },
+          },
+          200,
+        ),
+      );
+      const err = await runAndCatch({ apiKey: "k1" });
+      assert.equal(err.exitCode, 2);
+      assert.match(err.message, NETWORK_COPY);
+      assert.match(err.message, expected);
+      assert.doesNotMatch(err.message, PER_IP_ONLY);
+    });
+  }
+
+  test("meta.quota.limit decides the layer over a contradicting X-RateLimit-Limit header", async () => {
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 200));
+    const perIp = await runAndCatch();
+    assert.match(perIp.message, /anonymous tier: 20\/day per IP\)/);
+    assert.doesNotMatch(perIp.message, /\/48/);
+    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 20));
+    const network = await runAndCatch();
+    assert.match(network.message, NETWORK_USED);
+  });
+
+  test("no meta: X-RateLimit-Limit 200 infers the anonymous tier (not member/free) and the network copy", async () => {
+    mockResponse({ status: 429, body: { error: "Daily search quota exhausted" }, headers: { "x-ratelimit-limit": "200" } });
+    const keyed = await runAndCatch({ apiKey: "k1" });
+    assert.equal(keyed.exitCode, 2);
+    assert.match(keyed.message, /this API key was served as anonymous/);
+    assert.match(keyed.message, NETWORK_USED);
+    assert.doesNotMatch(keyed.message, /member tier|free tier/);
+    mockResponse({ status: 429, body: { error: "Daily search quota exhausted" }, headers: { "x-ratelimit-limit": "200" } });
+    const anon = await runAndCatch();
+    assert.match(anon.message, NETWORK_COPY);
+    assert.match(anon.message, /sign in free/);
+  });
+
   test("429 without 'quota' in message → exit 3 rate-limit (not daily quota)", async () => {
     mockResponse({
       status: 429,
