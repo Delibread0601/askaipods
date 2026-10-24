@@ -7,53 +7,49 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 5/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 3/20 daily*
 
 ## Results — newest first
 
-### 1. The Cognitive Revolution — AI:AM: A Level We Shouldn't Pass? Notes from The Curve + Tokens vs. Salaries & Is SaaS Cooked?
-*2026-10-08* · https://www.youtube.com/watch?v=g_K9pqbQJwU · around 17:20: https://www.youtube.com/watch?v=g_K9pqbQJwU&t=1040s
+### 1. Nerd Snipe — Meta Thrives While Google Lies
+*2026-10-22* · https://www.youtube.com/watch?v=H0H_zhKnu3U · around 1:09:05: https://www.youtube.com/watch?v=H0H_zhKnu3U&t=4145s
 
-> Prakash said Elon Musk is betting that infrastructure matters more than
-> models and is planning for 2029-2031 (terawatt-scale efforts, SpaceX
-> satellites in the 2030s), while Anthropic and OpenAI are planning for a
-> two-to-three-year horizon, with AGI/RSI around 2028-2029 (Prakash).
+> Ben's conservative guess for models handling full open-ended decisions
+> is two to three years at most, or as soon as next year if things
+> accelerate.
 
-### 2. ChinaTalk — Washington is AGI-Pilled | Kevin Roose
-*2026-10-08* · https://www.youtube.com/watch?v=e8NQczdKrks · around 55:50: https://www.youtube.com/watch?v=e8NQczdKrks&t=3350s
+### 2. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
+*2026-10-22* · https://www.youtube.com/watch?v=A0kTUP7fWtk · around 10:20: https://www.youtube.com/watch?v=A0kTUP7fWtk&t=620s
 
-> Roose said the story he cares most about now is recursive self-improvement
-> and whether an intelligence explosion arrives in 2027, which serious
-> people now tell him could happen, including full automation of AI R&D next
-> year.
+> Patel noted that Anthropic does not rule out that Claude might be
+> conscious, that OpenAI's Greg Brockman has said 'we think this is AGI',
+> and that Demis Hassabis has said 'we stand at the foothills of the
+> singularity'.
 
-### 3. ChinaTalk — Washington is AGI-Pilled | Kevin Roose
-*2026-10-08* · https://www.youtube.com/watch?v=e8NQczdKrks · around 58:35: https://www.youtube.com/watch?v=e8NQczdKrks&t=3515s
+### 3. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
+*2026-10-22* · https://www.youtube.com/watch?v=A0kTUP7fWtk · around 42:05: https://www.youtube.com/watch?v=A0kTUP7fWtk&t=2525s
 
-> Jordan predicted that if AI doubles in capability every month or so,
-> developed societies will reject an industrial-revolution-scale shock over
-> five years and a political 'just say no' response will gain momentum;
-> Roose mentioned a 'Butlerian Jihad' as possible.
+> Gates called 20 years 'a reasonably safe number', noting that estimates
+> for humanoid robots range from two to three years to around eight years.
 
-### 4. The Cognitive Revolution — AI:AM: A Level We Shouldn't Pass? Notes from The Curve + Tokens vs. Salaries & Is SaaS Cooked?
-*2026-10-08* · https://www.youtube.com/watch?v=g_K9pqbQJwU · around 22:20: https://www.youtube.com/watch?v=g_K9pqbQJwU&t=1340s
+### 4. In Good Company — Eric Schmidt: Are We Ready for Superintelligence? | Podcast | In Good Company
+*2026-10-21* · https://www.youtube.com/watch?v=U5YtR3OG5Uo · around 11:05: https://www.youtube.com/watch?v=U5YtR3OG5Uo&t=665s
 
-> Insiders repeatedly said they expect to be bottlenecked on safety and
-> alignment, but that enough low-hanging fruit (such as fixing RL
-> environments) remains to release the next one or two generations
-> comfortably; beyond that, 'all bets are off' (host).
+> Schmidt estimated AGI, or true AI discovery, is 5 to 10 years away,
+> while admitting 'we don't know' (Schmidt).
 
-### 5. Pioneers of AI — OpenAI’s Tibo Sottiaux doesn’t want humans to be an ‘afterthought’
-*2026-10-07* · https://www.youtube.com/watch?v=rzh4uC2-SqU
+### 5. Super Data Science — Guest Episodes — What Survives When AI Can Build Anything? (with Dr. Richard Socher)
+*2026-10-20* · https://www.youtube.com/watch?v=NHNRhM9wl5w · around 40:35: https://www.youtube.com/watch?v=NHNRhM9wl5w&t=2435s
 
-> Sotio said there is no clear definition of AGI, but predicted that in a
-> couple of years people will point to roughly this period as when it was
-> achieved.
+> Krohn quoted Socher as saying RSI and superintelligence could arrive
+> within two years; Socher replied, 'It might even be less than 2 years,
+> it might be only 1 year... it's looking very, very promising'
+> (exchange).
 
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-10-10 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-10-24 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 
