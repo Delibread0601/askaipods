@@ -7,49 +7,50 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 3/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 7/20 daily*
 
 ## Results — newest first
 
-### 1. Nerd Snipe — Meta Thrives While Google Lies
+### 1. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
+*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 7:20: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=440s
+
+> Zvi said the people he trusts most on this question believe 2027 will
+> be 'completely crazy' and 2028 'might be unrecognizable'.
+
+### 2. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
+*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 8:35: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=515s
+
+> Zvi said many people now agree the trajectory is clear: things are
+> already 'low level out of hand', slow-takeoff RSI has already begun at
+> a low level, and by mid-next year things will look much faster.
+
+### 3. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
+*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 0:00: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=0s
+
+> Zvi Mowshowitz (author of 'Don't Worry About the Vase') said that if
+> nothing slows the labs, the gap between advances the size of a current
+> model release could shrink from two months to one month, then two
+> weeks, then one week ('stuff like that could happen').
+
+### 4. Nerd Snipe — Meta Thrives While Google Lies
 *2026-10-22* · https://www.youtube.com/watch?v=H0H_zhKnu3U · around 1:09:05: https://www.youtube.com/watch?v=H0H_zhKnu3U&t=4145s
 
 > Ben's conservative guess for models handling full open-ended decisions
 > is two to three years at most, or as soon as next year if things
 > accelerate.
 
-### 2. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
+### 5. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
 *2026-10-22* · https://www.youtube.com/watch?v=A0kTUP7fWtk · around 10:20: https://www.youtube.com/watch?v=A0kTUP7fWtk&t=620s
 
 > Patel noted that Anthropic does not rule out that Claude might be
-> conscious, that OpenAI's Greg Brockman has said 'we think this is AGI',
-> and that Demis Hassabis has said 'we stand at the foothills of the
-> singularity'.
-
-### 3. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
-*2026-10-22* · https://www.youtube.com/watch?v=A0kTUP7fWtk · around 42:05: https://www.youtube.com/watch?v=A0kTUP7fWtk&t=2525s
-
-> Gates called 20 years 'a reasonably safe number', noting that estimates
-> for humanoid robots range from two to three years to around eight years.
-
-### 4. In Good Company — Eric Schmidt: Are We Ready for Superintelligence? | Podcast | In Good Company
-*2026-10-21* · https://www.youtube.com/watch?v=U5YtR3OG5Uo · around 11:05: https://www.youtube.com/watch?v=U5YtR3OG5Uo&t=665s
-
-> Schmidt estimated AGI, or true AI discovery, is 5 to 10 years away,
-> while admitting 'we don't know' (Schmidt).
-
-### 5. Super Data Science — Guest Episodes — What Survives When AI Can Build Anything? (with Dr. Richard Socher)
-*2026-10-20* · https://www.youtube.com/watch?v=NHNRhM9wl5w · around 40:35: https://www.youtube.com/watch?v=NHNRhM9wl5w&t=2435s
-
-> Krohn quoted Socher as saying RSI and superintelligence could arrive
-> within two years; Socher replied, 'It might even be less than 2 years,
-> it might be only 1 year... it's looking very, very promising'
-> (exchange).
+> conscious, that OpenAI's Greg Brockman has said 'we think this is
+> AGI', and that Demis Hassabis has said 'we stand at the foothills of
+> the singularity'.
 
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-10-24 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-10-26 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 

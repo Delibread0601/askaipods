@@ -41,7 +41,7 @@ node <skill-dir>/scripts/askaipods.mjs search --format json -- <SINGLE_QUOTED_QU
 
 Pass the topic, not the whole request: drop only the time words already mapped to `--days` and filler like "what are people saying about", keep names; for a non-English question, an English rendering of the topic matches the mostly English corpus better. `--` keeps a query that starts with `-` positional. The query must be 1–300 characters after trimming (longer is rejected locally with exit 1).
 
-**Fallback** — only when `scripts/askaipods.mjs` is not available (e.g. the user shared just this file, or Node reports `Cannot find module` for it although the path points into the folder containing this SKILL.md): run the same arguments through the pinned npm release, `npx -y askaipods@0.3.4 search --format json -- <SINGLE_QUOTED_QUERY>`. Keep the exact version; never run an unpinned or `@latest` askaipods. The fallback also needs `registry.npmjs.org` and a writable npm cache.
+**Fallback** — only when `scripts/askaipods.mjs` is not available (e.g. the user shared just this file, or Node reports `Cannot find module` for it although the path points into the folder containing this SKILL.md): run the same arguments through the pinned npm release, `npx -y askaipods@0.3.5 search --format json -- <SINGLE_QUOTED_QUERY>`. Keep the exact version; never run an unpinned or `@latest` askaipods. The fallback also needs `registry.npmjs.org` and a writable npm cache.
 
 Options:
 
