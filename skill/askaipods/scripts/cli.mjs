@@ -11,8 +11,8 @@
 //     on isTTY behavior across shells.
 
 import { parseArgs } from "node:util";
-import { search, AskaipodsError, SORT_VALUES } from "./client.js";
-import { renderJson, renderMarkdown } from "./format.js";
+import { search, AskaipodsError, SORT_VALUES } from "./client.mjs";
+import { renderJson, renderMarkdown } from "./format.mjs";
 
 const VERSION = "0.3.4";
 
@@ -28,7 +28,8 @@ OPTIONS:
                              caps: anonymous 30, free 90, member 365; omitted = the cap)
   --sort <recency|relevance> Result selection (default: recency). relevance is member-only — other tiers are
                              served recency, reported in the output's sort.served
-  --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY env var)
+  --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY). Prefer the env var: a key on the
+                             command line shows up in shell history, process lists and agent transcripts
   -h, --help                 Show this message
   -v, --version              Show version
 
@@ -130,7 +131,7 @@ export async function run(argv) {
     // Strict positive integer match. Three reasons for the shape:
     //   (1) parseInt("7abc",10) silently returns 7 — reject any
     //       non-digit suffix / scientific notation / decimals / sign.
-    //   (2) client.js only forwards `days` to the API when it's > 0,
+    //   (2) client.mjs only forwards `days` to the API when it's > 0,
     //       so "0" or "00" would silently drop the filter entirely
     //       instead of filtering to "0 days" as the user expected.
     //   (3) Number.parseInt("9".repeat(400), 10) returns Infinity, and
@@ -172,7 +173,7 @@ export async function run(argv) {
   // HTTP header values must be ByteStrings (each character ≤ 0xFF).
   // Characters outside the printable ASCII + Latin-1 extended range
   // cause Node's Headers constructor to throw a ByteString TypeError,
-  // which the fetch catch in client.js would mislabel as a network
+  // which the fetch catch in client.mjs would mislabel as a network
   // error (exit 3) instead of a user input problem. This allowlist
   // rejects C0 controls (0x00-0x1F), DEL (0x7F), and any codepoint
   // above 0xFF (LS, PS, ZWSP, emoji, etc.) at the CLI boundary with

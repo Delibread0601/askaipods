@@ -98,7 +98,7 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 // Validate the PodLens success envelope against the documented contract.
 // Any mismatch is treated as a protocol break and surfaces as exit 3 —
 // better a loud AskaipodsError(exitCode=3) than a TypeError escaping as
-// exit 1 when format.js tries to operate on malformed fields.
+// exit 1 when format.mjs tries to operate on malformed fields.
 //
 // Required envelope:
 //   data                       : non-array object
@@ -130,7 +130,7 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //   data.meta.query_hash, data.meta.restrictions, data.meta.window
 //
 // Optional but shape-checked because they drive conditional render
-// branches in format.js — a malformed value would let the bad state
+// branches in format.mjs — a malformed value would let the bad state
 // silently cross the exit-0 / exit-3 boundary:
 //   data.meta.quota.refunded    — boolean iff present (drives header
 //                                 "· refunded" tag in renderMarkdown)
@@ -209,12 +209,12 @@ function isValidSuccessEnvelope(data) {
   if (typeof q.limit !== "number" || !Number.isFinite(q.limit)) return false;
   // quota.refunded is optional; when present it MUST be boolean. A
   // string like "yes" would truthy-trigger the "· refunded" tag in
-  // format.js renderMarkdown header, claiming a refund that didn't
+  // format.mjs renderMarkdown header, claiming a refund that didn't
   // happen.
   if (q.refunded !== undefined && typeof q.refunded !== "boolean") return false;
   // warning is optional; when present it MUST be a plain object with a
   // string `code`. A non-string code would bypass the equality checks
-  // in format.js empty-result ladder and non-empty banner, producing
+  // in format.mjs empty-result ladder and non-empty banner, producing
   // no user-facing message when one was intended.
   if (m.warning != null) {
     if (!isPlainObject(m.warning)) return false;
@@ -232,7 +232,7 @@ function isValidSuccessEnvelope(data) {
   //     via `return false`. A non-string newest_date means the server
   //     broke contract shape-wise.
   //   - Content (non-ISO / non-calendar-valid YYYY-MM-DD): coerce
-  //     `newest_date` to null in place. format.js banner treats null
+  //     `newest_date` to null in place. format.mjs banner treats null
   //     as "no freshness data" and omits the "newest indexed episode:
   //     X" suffix cleanly.
   if (m.corpus_freshness != null) {
@@ -265,7 +265,7 @@ function isValidSuccessEnvelope(data) {
       }
       if (!isoValid) {
         // Coerce malformed ISO content to null and continue validation.
-        // Downstream format.js sees null and skips the freshness banner
+        // Downstream format.mjs sees null and skips the freshness banner
         // suffix, matching the server's own probe-failure degradation.
         m.corpus_freshness.newest_date = null;
       }
@@ -275,7 +275,7 @@ function isValidSuccessEnvelope(data) {
   // but reject non-object so future render paths don't crash on a
   // primitive where they expect an object.
   if (m.cta != null && !isPlainObject(m.cta)) return false;
-  // window shape-check (R3-01): format.js renderMarkdown reads
+  // window shape-check (R3-01): format.mjs renderMarkdown reads
   // `window.truncated`, `window.expanded`, `window.requested_days`,
   // `window.served_days` to drive the empty-result priority ladder.
   // A malformed window (e.g., `expanded: "true"` string, missing
@@ -386,6 +386,18 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
 // so it maps to exit 2 (stop for today), not exit 3 (retry).
 const CAPACITY_REACHED = /daily capacity reached/i;
 
+// Connection-level failure codes a network-blocking sandbox produces
+// (DNS refused or unresolvable, connect denied or unroutable).
+const NETWORK_BLOCK_CODES = new Set([
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "ECONNREFUSED",
+  "EACCES",
+  "EPERM",
+  "ENETUNREACH",
+  "EHOSTUNREACH",
+]);
+
 function capacityReachedMessage() {
   return (
     "podlens.net's daily capacity for anonymous-level searches is used up (shared by every caller served at the " +
@@ -449,10 +461,24 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
         `request to podlens.net timed out after ${TIMEOUT_MS / 1000}s (possible network stall or slow upstream). Retry in a moment.`,
       );
     }
-    // fetch() throws TypeError on DNS / connection failure. Treat as
-    // exit code 3 (transient/network) so the SKILL.md can advise
-    // "retry in a moment" instead of looking like a usage error.
-    throw exitErr(3, `network error contacting podlens.net: ${err?.message ?? err}`);
+    // fetch() throws TypeError("fetch failed") on DNS / connection
+    // failure and keeps the reason only in `err.cause.code`. Surface that
+    // code: a host sandbox that blocks the network shows up as one of
+    // these, and an agent cannot tell "blocked" from "flaky" without it.
+    // The codes cannot prove a sandbox (a real DNS outage looks the same),
+    // so the hint says "may be". Still exit 3 (transient/network).
+    const code = typeof err?.cause?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(err.cause.code) ? err.cause.code : null;
+    let hint = "";
+    if (code && NETWORK_BLOCK_CODES.has(code)) {
+      // Proxy-based sandboxes (Claude Code's among them) allow traffic only
+      // through the proxy named in HTTPS_PROXY, and Node's fetch ignores
+      // that variable unless NODE_USE_ENV_PROXY=1 (Node 22.21+ / 24+).
+      const proxied = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"].some((k) => process.env[k]);
+      hint = proxied && process.env.NODE_USE_ENV_PROXY !== "1"
+        ? " — HTTPS_PROXY is set but Node's fetch ignores it unless NODE_USE_ENV_PROXY=1: rerun with NODE_USE_ENV_PROXY=1 in the environment (Node 22.21+ or 24+)"
+        : " — if this runs inside a sandbox, outbound HTTPS to podlens.net may be blocked; allow podlens.net or ask the user to approve network access instead of retrying";
+    }
+    throw exitErr(3, `network error contacting podlens.net: ${err?.message ?? err}${code ? ` (${code})` : ""}${hint}`);
   }
 
   // The server always responds with JSON for both success and error

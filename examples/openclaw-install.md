@@ -43,12 +43,12 @@ In OpenClaw, ask:
 
 > What are AI podcasts saying about reasoning models?
 
-OpenClaw should recognize the trigger phrase, shell out to `npx -y askaipods search --format json -- "..."` (argv-style per SKILL.md's invocation rule), and render the structured response per the SKILL.md template.
+OpenClaw should recognize the trigger phrase, run the bundled `node <skill-dir>/scripts/askaipods.mjs search --format json -- '...'` (falling back to the pinned `npx -y askaipods@<version>` named in SKILL.md only when the scripts folder is missing), and render the structured response per the SKILL.md template.
 
 ## Troubleshooting
 
 - **Skill not detected**: OpenClaw watches skill folders and refreshes when `SKILL.md` changes; if the skill still does not appear, start a new session or restart the OpenClaw Gateway (`openclaw skills update` tracks ClawHub installs only, not this Git/copied install). Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
-- **`npx askaipods` fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
+- **The search command fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
 - **Conflicting copies across precedence levels**: Only the highest-precedence one wins. If you have askaipods in both `~/.agents/skills/` and `<workspace>/skills/`, the workspace one takes effect.
 
 ## Reference

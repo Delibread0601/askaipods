@@ -13,6 +13,16 @@
 
 const WAITLIST_URL = "https://podlens.net/dashboard?source=askaipods#waitlist";
 
+// Markdown output prints server strings (podcast-derived text, titles,
+// codes) straight to a terminal. Replace control characters (an ESC
+// sequence can rewrite the screen or plant an OSC-8 hyperlink) and bidi
+// overrides, and fold line breaks so no field can open a new heading or
+// leave its quote block. JSON output keeps the raw values.
+const UNSAFE_CHARS = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+function oneLine(value) {
+  return String(value).replace(UNSAFE_CHARS, " ").replace(/\s+/g, " ").trim();
+}
+
 // The tier's --days cap as the server reported it (meta.restrictions
 // .max_days), so the copy stays right on servers with different caps.
 // Falls back to the given default when the field is absent or malformed
@@ -37,7 +47,7 @@ function tierNote(data) {
   }
   if (data.tier === "free") {
     const cap = capDays(data, 90);
-    const waitlist = typeof data.meta.cta?.waitlist === "string" ? data.meta.cta.waitlist : WAITLIST_URL;
+    const waitlist = typeof data.meta.cta?.waitlist === "string" ? oneLine(data.meta.cta.waitlist) : WAITLIST_URL;
     return (
       `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
       "Relevance ordering, --days up to 365 and 100 searches/day are member features; membership is granted " +
@@ -52,8 +62,12 @@ function tierNote(data) {
 // used up, the account is inside its first 48 hours, or (a reason this
 // version does not know) a neutral statement of the level served.
 function downgradeNote(data) {
-  const d = data.downgraded;
-  if (!d) return null;
+  if (!data.downgraded) return null;
+  const d = {
+    from: oneLine(data.downgraded.from),
+    reason: oneLine(data.downgraded.reason),
+    waitlist: oneLine(data.downgraded.waitlist),
+  };
   const level = `the anonymous level (--days cap ${capDays(data, 30)}, 20 searches/day per IP)`;
   if (d.reason === "free_pool_exhausted") {
     return (
@@ -123,14 +137,14 @@ export function sortByDateDesc(items) {
 //     always relevance-selected, anonymous ones recency-selected.
 //
 // Preconditions: `response` must be a validated success envelope from
-// `client.search()`. `client.js` validates `meta.tier` is a non-empty
+// `client.search()`. `client.mjs` validates `meta.tier` is a non-empty
 // string and `meta.quota` is an object before returning, so we read
 // those fields directly here without a fallback. A programmatic caller
 // that bypasses client.search() and hands toStructured a malformed
 // response will get a TypeError — that's louder than a silent fallback
-// and matches the "protocol break → exit 3" philosophy of client.js.
+// and matches the "protocol break → exit 3" philosophy of client.mjs.
 export function toStructured(query, response) {
-  // These fields are guaranteed by client.js's success-envelope validator:
+  // These fields are guaranteed by client.mjs's success-envelope validator:
   //   response.results (array), response.meta (object),
   //   response.meta.tier (non-empty string), response.meta.quota (object).
   // Read them directly. The remaining fields below (total,
@@ -170,12 +184,12 @@ export function toStructured(query, response) {
       episode: r.episode_title ?? null,
       date: r.published_at ?? null,
       // YouTube watch URL for the episode (start of the video); null when
-      // the server has none. client.js already nulled anything outside the
+      // the server has none. client.mjs already nulled anything outside the
       // watch-URL shape.
       url: r.url ?? null,
       // Approximate start of the passage the quote comes from (seconds)
       // and the url opened there; null when the server has no confident
-      // timestamp. client.js keeps them only as a consistent pair.
+      // timestamp. client.mjs keeps them only as a consistent pair.
       anchor_s: r.anchor_s ?? null,
       anchor_url: r.anchor_url ?? null,
       text: r.text ?? "",
@@ -214,13 +228,13 @@ export function renderMarkdown(query, response) {
   const data = toStructured(query, response);
   const lines = [];
 
-  lines.push(`# askaipods · "${query}"`);
+  lines.push(`# askaipods · "${oneLine(query)}"`);
   lines.push("");
 
   const quota = data.meta.quota;
   const tierLabel = data.tier;
   const quotaLabel = quota
-    ? `${quota.used}/${quota.limit} ${quota.period ?? "daily"}`
+    ? `${quota.used}/${quota.limit} ${oneLine(quota.period ?? "daily")}`
     : "unknown";
   // Server's P1-b narrow refund: when corpus is stale AND delivered
   // results are empty, the quota slot is refunded (see server CLAUDE.md
@@ -250,7 +264,7 @@ export function renderMarkdown(query, response) {
 
   if (data.results.length === 0) {
     const win = data.meta.window;
-    const warningCode = data.meta.warning?.code;
+    const warningCode = data.meta.warning?.code && oneLine(data.meta.warning.code);
     const newest = data.meta.corpus_freshness?.newest_date;
     // Priority: freshness warnings take precedence over window/expansion
     // messaging because they tell the user something stronger — the
@@ -319,7 +333,7 @@ export function renderMarkdown(query, response) {
   // the user knows the set is incomplete rather than authoritative.
   // Placed before the expansion note so freshness signals dominate —
   // same priority intent as the empty-branch ladder.
-  const warningCode = data.meta.warning?.code;
+  const warningCode = data.meta.warning?.code && oneLine(data.meta.warning.code);
   const newest = data.meta.corpus_freshness?.newest_date;
   if (warningCode === "corpus_stale_for_requested_window") {
     const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
@@ -362,8 +376,8 @@ export function renderMarkdown(query, response) {
 
   for (let i = 0; i < data.results.length; i++) {
     const r = data.results[i];
-    const title = r.episode ?? "Untitled episode";
-    const podcast = r.podcast ?? "Unknown podcast";
+    const title = oneLine(r.episode ?? "") || "Untitled episode";
+    const podcast = oneLine(r.podcast ?? "") || "Unknown podcast";
     const date = r.date ?? "date unknown";
     lines.push(`### ${i + 1}. ${podcast} — ${title}`);
     // Bare URL rather than a [label](url) link: terminals and GFM
@@ -372,8 +386,8 @@ export function renderMarkdown(query, response) {
     if (r.anchor_url) line += ` · around ${clock(r.anchor_s)}: ${r.anchor_url}`;
     lines.push(line);
     lines.push("");
-    // Quote-block the text and collapse newlines so the markdown stays compact.
-    const text = (r.text ?? "").replace(/\s+/g, " ").trim();
+    // Quote-block the text on one line so the markdown stays compact.
+    const text = oneLine(r.text ?? "");
     lines.push(`> ${text}`);
     lines.push("");
   }

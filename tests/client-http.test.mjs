@@ -1,4 +1,4 @@
-// Tests for client.js status → exit-code mapping, 429 tier-aware message
+// Tests for client.mjs status → exit-code mapping, 429 tier-aware message
 // (old and new server shapes),
 // and the R7-02 / R8-01 timeout / body-read distinction.
 
@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { search, AskaipodsError } from "../src/client.js";
+import { search, AskaipodsError } from "../skill/askaipods/scripts/client.mjs";
 import {
   mockResponse,
   mockTimeoutFetch,
@@ -84,7 +84,7 @@ describe("search — happy path", () => {
 
   test("User-Agent advertises the EXACT current version from package.json (R13-03 version-bump parity)", async () => {
     // Semver-shape regex would pass for any version. Pin the exact string
-    // read from package.json so a forgotten bump in client.js fails here.
+    // read from package.json so a forgotten bump in client.mjs fails here.
     const calls = mockResponse({ body: validEnvelope() });
     await search({ query: "hi", endpoint: "https://mock/" });
     assert.equal(
@@ -111,7 +111,7 @@ describe("search — happy path", () => {
     try {
       const calls = mockResponse({ body: validEnvelope() });
       await search({ query: "hi", endpoint: "https://mock/" });
-      assert.deepEqual(timeoutArgs, [30_000], "client.js must call AbortSignal.timeout(30_000)");
+      assert.deepEqual(timeoutArgs, [30_000], "client.mjs must call AbortSignal.timeout(30_000)");
       assert.equal(
         calls[0].init.signal,
         sentinel,
@@ -551,5 +551,57 @@ describe("search — network / timeout classes (R7-02, R8-01)", () => {
     assert.equal(err.exitCode, 3);
     assert.match(err.message, /network error/i);
     assert.match(err.message, /ENOTFOUND/);
+  });
+
+  const PROXY_VARS = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"];
+
+  // Node's fetch throws TypeError("fetch failed") and keeps the reason
+  // only in err.cause.code — the code a network-blocking sandbox yields.
+  for (const code of ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED", "EACCES", "EPERM", "ENETUNREACH", "EHOSTUNREACH"]) {
+    test(`fetch failed with cause ${code} → exit 3, code surfaced, sandbox hint`, async () => {
+      mockNetworkErrorFetch("fetch failed", { code });
+      // A developer shell behind a proxy would switch the hint to the
+      // NODE_USE_ENV_PROXY one (tested below); pin the no-proxy case.
+      const saved = Object.fromEntries(PROXY_VARS.map((k) => [k, process.env[k]]));
+      for (const k of PROXY_VARS) delete process.env[k];
+      let err;
+      try {
+        err = await runAndCatch();
+      } finally {
+        for (const k of PROXY_VARS) if (saved[k] !== undefined) process.env[k] = saved[k];
+      }
+      assert.equal(err.exitCode, 3);
+      assert.match(err.message, new RegExp(`fetch failed \\(${code}\\)`));
+      assert.match(err.message, /if this runs inside a sandbox, outbound HTTPS to podlens\.net may be blocked/);
+    });
+  }
+
+  test("blocked code with HTTPS_PROXY set (proxy-based sandbox) → NODE_USE_ENV_PROXY hint", async () => {
+    const saved = { p: process.env.HTTPS_PROXY, u: process.env.NODE_USE_ENV_PROXY };
+    process.env.HTTPS_PROXY = "http://localhost:8080";
+    delete process.env.NODE_USE_ENV_PROXY;
+    try {
+      mockNetworkErrorFetch("fetch failed", { code: "ENOTFOUND" });
+      const err = await runAndCatch();
+      assert.equal(err.exitCode, 3);
+      assert.match(err.message, /HTTPS_PROXY is set but Node's fetch ignores it unless NODE_USE_ENV_PROXY=1/);
+    } finally {
+      if (saved.p === undefined) delete process.env.HTTPS_PROXY; else process.env.HTTPS_PROXY = saved.p;
+      if (saved.u !== undefined) process.env.NODE_USE_ENV_PROXY = saved.u;
+    }
+  });
+
+  test("fetch failed with a TLS cause → code surfaced, no sandbox hint", async () => {
+    mockNetworkErrorFetch("fetch failed", { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" });
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 3);
+    assert.match(err.message, /\(UNABLE_TO_VERIFY_LEAF_SIGNATURE\)/);
+    assert.doesNotMatch(err.message, /sandbox/);
+  });
+
+  test("a cause code outside the safe shape is not echoed", async () => {
+    mockNetworkErrorFetch("fetch failed", { code: "x\u001b]8;;evil\u0007" });
+    const err = await runAndCatch();
+    assert.equal(err.message, "network error contacting podlens.net: fetch failed");
   });
 });

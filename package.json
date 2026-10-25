@@ -6,13 +6,12 @@
   "bin": {
     "askaipods": "bin/askaipods.js"
   },
-  "main": "./src/cli.js",
+  "main": "./skill/askaipods/scripts/cli.mjs",
   "exports": {
-    ".": "./src/cli.js"
+    ".": "./skill/askaipods/scripts/cli.mjs"
   },
   "files": [
     "bin",
-    "src",
     "skill",
     "examples",
     "README.md",

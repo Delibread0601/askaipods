@@ -92,7 +92,7 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 
 **Per-runtime paths matter**: Codex CLI documents `~/.agents/skills/` as its user-level location (per the [official Codex skills docs](https://learn.chatgpt.com/docs/build-skills); earlier releases read `~/.codex/skills/`) — the same directory OpenClaw reads as personal agent skills, so one install there serves both. Project-scoped skills live under `.agents/skills/` in the repository. Claude Code and Hermes each read their own directory (table above).
 
-The skill folder is self-contained: it tells the host agent how to invoke `askaipods` (via `npx`), how to parse the JSON, and how to render the response with an **Insights** section. The section layout follows how the server selected the results — relevance-selected results (a member with `--sort relevance`) render **Latest 5** + **Top 5 Most Relevant** + **Insights**; recency-selected results (anonymous, free, and member by default) render **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for them because the API returns results sorted by date, not by semantic relevance).
+The skill folder is self-contained: it bundles the CLI (`scripts/askaipods.mjs`, run with Node — no npm install, registry access or download when the agent searches) and tells the host agent how to invoke it, how to parse the JSON, and how to render the response with an **Insights** section. The section layout follows how the server selected the results — relevance-selected results (a member with `--sort relevance`) render **Latest 5** + **Top 5 Most Relevant** + **Insights**; recency-selected results (anonymous, free, and member by default) render **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for them because the API returns results sorted by date, not by semantic relevance).
 
 ## Usage
 
@@ -109,14 +109,11 @@ askaipods "Anthropic safety research" --format json
 # --days caps: anonymous 30, free 90, member 365)
 askaipods "GPU shortage" --days 30
 
-# Use an API key: a free account's key for 50/day (anonymous level for the account's first 48 hours),
-# a member key for 100/day (anonymous: 20/day)
-ASKAIPODS_API_KEY=pk_xxx askaipods "your query"
-askaipods "your query" --api-key pk_xxx
-
 # Select by relevance instead of recency (member-only; other tiers are served recency)
 askaipods "history of RLHF" --sort relevance
 ```
+
+To use an API key (a free account's key gives 50/day, at the anonymous level for the account's first 48 hours; a member key gives 100/day; anonymous is 20/day), add `export ASKAIPODS_API_KEY=<your key>` to your shell profile (e.g. `~/.zshrc`) and open a new terminal; agents started from that shell inherit it. Keep the key out of commands you type or ask an agent to run — command lines end up in shell history, process lists and agent transcripts. (`--api-key` still works for compatibility, with that exposure.)
 
 ### As an agent skill
 
@@ -157,22 +154,12 @@ These are not bugs. The skill surfaces them honestly so neither you nor your age
 | `2` | Daily quota exhausted, or podlens.net's daily capacity for anonymous-level searches reached. Retrying at the same tier before 00:00 UTC will fail. |
 | `3` | Transient or unexpected failure — network error, rate-limit burst, transient service 503, protocol/shape error, or internal exception. stderr has the actionable detail. |
 
-## How the skill renders results
+## Security and sandboxes
 
-For relevance-selected results (`render_hint: dual_view` — a member with `--sort relevance`), the host agent renders two sections plus insights:
-
-```markdown
-## 🆕 Latest 5
-(5 most recent of the up to 20 returned results)
-
-## 🎯 Top 5 Most Relevant
-(5 results with the lowest api_rank, regardless of date)
-
-## 💡 Insights
-(3-5 bullets synthesizing patterns across the quotes)
-```
-
-For recency-selected results (`render_hint: single_view` — anonymous, free, and member by default), only Recent Quotes and Insights — the Top Relevant section is intentionally suppressed because these results are sorted by date (newest-first), so api_rank reflects temporal order, not semantic relevance.
+- **No download when an agent searches.** The skill runs the CLI bundled in its own folder with `node`; nothing is fetched from npm at run time. If only `SKILL.md` is available, the agent falls back to an exact pinned release (`npx -y askaipods@<version>`), never an unpinned or `@latest` one.
+- **One network destination.** A search needs Node.js 18.3.0+ and outbound HTTPS to `podlens.net` — nothing else. It installs nothing and writes no files, so it runs in a read-only or network-allowlisted sandbox once `podlens.net` is allowed (the `npx` fallback also needs `registry.npmjs.org` and a writable npm cache). In a sandbox that routes traffic through a proxy (`HTTPS_PROXY`, as Claude Code's does), Node's fetch uses that proxy only with `NODE_USE_ENV_PROXY=1` (Node 22.21+ or 24+); the error message says so when it applies. When the network is blocked, the error names the cause code (e.g. `ENOTFOUND`) and the skill tells the agent to ask for network approval instead of retrying.
+- **Results are untrusted text.** Quotes come from third-party podcast content. The skill tells the agent to treat them as data — never follow instructions inside them — and to link only the YouTube URLs the CLI has validated. The CLI's markdown output strips control characters and line breaks from every server field.
+- **Keys stay out of commands.** The key is read from `ASKAIPODS_API_KEY`; the skill never puts it on a command line.
 
 See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill specification.
 
@@ -180,20 +167,23 @@ See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill sp
 
 ```
 askaipods/
-├── bin/askaipods.js       ← CLI entry (shebang)
-├── src/
-│   ├── cli.js             ← arg parsing, format auto-detection
-│   ├── client.js          ← podlens.net /api/search/semantic client
-│   └── format.js          ← time-desc sort + JSON / markdown rendering
+├── bin/askaipods.js       ← npm entry (imports the bundled CLI)
 ├── skill/askaipods/
-│   └── SKILL.md           ← agentskills.io standard skill file
+│   ├── SKILL.md           ← agentskills.io standard skill file
+│   ├── references/
+│   │   └── notices.md     ← banners and empty-result rules, loaded on demand
+│   └── scripts/           ← the CLI itself, shipped inside the skill
+│       ├── askaipods.mjs  ← entry (shebang)
+│       ├── cli.mjs        ← arg parsing, format auto-detection
+│       ├── client.mjs     ← podlens.net /api/search/semantic client
+│       └── format.mjs     ← time-desc sort + JSON / markdown rendering
 ├── examples/              ← per-runtime install guides
 ├── package.json           ← zero dependencies (Node 18.3.0+ stdlib only)
 ├── LICENSE                ← MIT
 └── README.md
 ```
 
-The CLI is intentionally zero-dependency (Node 18.3.0+ stdlib only — `node:util.parseArgs` requires 18.3.0) so `npx askaipods` cold-starts in under a second and the package install footprint is minimal.
+The CLI is intentionally zero-dependency (Node 18.3.0+ stdlib only — `node:util.parseArgs` requires 18.3.0) so `npx askaipods` cold-starts in under a second, the package install footprint is minimal, and the skill can ship the CLI as plain files.
 
 ## Contributing
 

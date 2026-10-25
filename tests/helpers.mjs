@@ -84,9 +84,9 @@ export function mockNonJsonFetch(status = 502) {
 
 // fetch stub that throws a TypeError (fetch()'s canonical "network
 // failure" exception — DNS, connection refused, etc.).
-export function mockNetworkErrorFetch(message = "fetch failed") {
+export function mockNetworkErrorFetch(message = "fetch failed", cause) {
   installFetchMock(async () => {
-    throw new TypeError(message);
+    throw new TypeError(message, cause === undefined ? undefined : { cause });
   });
 }
 

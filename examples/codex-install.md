@@ -33,13 +33,14 @@ In Codex, ask:
 
 > What are people saying about reasoning models on AI podcasts?
 
-Codex should detect the trigger, run `npx -y askaipods search --format json -- "..."`, and render the structured response per `SKILL.md`.
+Codex should detect the trigger, run the bundled `node <skill-dir>/scripts/askaipods.mjs search --format json -- '...'` (falling back to the pinned `npx -y askaipods@<version>` named in SKILL.md only when the scripts folder is missing), and render the structured response per `SKILL.md`.
 
 ## Troubleshooting
 
 - **Skill not detected**: Restart Codex (per the official docs, "If an update doesn't appear, restart Codex").
 - **Multiple skills with the same name across scopes**: Codex shows both in the selector — pick the intended copy, or remove the duplicate.
-- **`npx askaipods` fails**: Check Node.js 18.3.0+: `node --version`.
+- **The search command fails**: Check Node.js 18.3.0+: `node --version`.
+- **Network blocked by the sandbox**: Codex's default `workspace-write` sandbox has network access off, so the search fails with `fetch failed (ENOTFOUND)` or similar. Approve the command when Codex asks for network access, or enable network access in your Codex sandbox settings (see the [Codex sandbox documentation](https://learn.chatgpt.com/docs/agent-approvals-security)); a search only needs `podlens.net`.
 
 ## Reference
 

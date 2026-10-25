@@ -7,7 +7,7 @@
 
 import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
-import { search, AskaipodsError } from "../src/client.js";
+import { search, AskaipodsError } from "../skill/askaipods/scripts/client.mjs";
 import {
   mockResponse,
   restoreFetch,
@@ -423,7 +423,7 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
   });
 
   test("rejects corpus_freshness.newest_date as non-string", async () => {
-    // Per client.js line 180, non-string is structural → envelope-fatal.
+    // Per client.mjs's success-envelope validator, non-string is structural → envelope-fatal.
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {

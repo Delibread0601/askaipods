@@ -1,10 +1,10 @@
-// Tests for format.js: toStructured passthrough, sortByDateDesc UTC
+// Tests for format.mjs: toStructured passthrough, sortByDateDesc UTC
 // comparison, and the tier / sort → render_hint contract on old and
 // three-tier servers.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { toStructured, sortByDateDesc, renderJson } from "../src/format.js";
+import { toStructured, sortByDateDesc, renderJson } from "../skill/askaipods/scripts/format.mjs";
 import { validEnvelope, validResult } from "./helpers.mjs";
 
 describe("sortByDateDesc — pure function", () => {

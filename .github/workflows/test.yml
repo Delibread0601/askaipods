@@ -1,0 +1,39 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["18.x", "22.x"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  # The suite needs node:test's beforeEach/afterEach (18.8+), so the declared runtime
+  # floor gets a smoke run of the CLI itself.
+  runtime-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "18.3.0"
+      - name: Bundled CLI starts and keeps its exit codes
+        run: |
+          node skill/askaipods/scripts/askaipods.mjs --version
+          node bin/askaipods.js --help > /dev/null
+          set +e
+          node skill/askaipods/scripts/askaipods.mjs > /dev/null 2>&1
+          test $? -eq 1

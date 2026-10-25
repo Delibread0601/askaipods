@@ -16,6 +16,12 @@ jobs:
         with:
           fetch-depth: 2
 
+      # No tag or release for a version whose tests fail.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22.x"
+      - run: npm test
+
       - name: Detect version change
         id: version
         run: |

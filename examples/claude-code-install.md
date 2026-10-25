@@ -39,13 +39,13 @@ Or trigger it organically:
 
 > Are coding agents replacing software engineers? What are people saying on AI podcasts?
 
-Claude Code should recognize the trigger phrase, run `npx -y askaipods search --format json -- "..."` (argv-style per SKILL.md's invocation rule), parse the response, and render the structured results per the SKILL.md template (the layout follows `render_hint`, i.e. the served ordering — relevance-selected results (a member with `--sort relevance`) show Latest + Top Relevant + Insights; recency-selected results (anonymous, free, and member by default) show Recent Quotes + Insights).
+Claude Code should recognize the trigger phrase, run the bundled `node <skill-dir>/scripts/askaipods.mjs search --format json -- '...'` (falling back to the pinned `npx -y askaipods@<version>` named in SKILL.md only when the scripts folder is missing), parse the response, and render the structured results per the SKILL.md template (the layout follows `render_hint`, i.e. the served ordering — relevance-selected results (a member with `--sort relevance`) show Latest + Top Relevant + Insights; recency-selected results (anonymous, free, and member by default) show Recent Quotes + Insights).
 
 ## Troubleshooting
 
 - **Skill not appearing**: Make sure `SKILL.md` sits directly in `~/.claude/skills/askaipods/` (or `.claude/skills/askaipods/`). Claude Code picks up new skills without a restart, but if the `skills` directory itself did not exist when the session started, run `/reload-skills`. Keep the directory name equal to the `name` field (`askaipods`), as the agentskills.io spec requires.
-- **`npx askaipods` fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The CLI uses zero dependencies so there are no other prereqs.
-- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then `export ASKAIPODS_API_KEY=pk_xxx` with the account's API key for 50/day (a new account searches at the anonymous level for its first 48 hours).
+- **The search command fails**: Check that Node.js 18.3.0+ is installed: `node --version`. The bundled CLI uses zero dependencies, so there are no other prereqs. In a sandboxed session, allow outbound HTTPS to `podlens.net` (the only host a search contacts).
+- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then add `export ASKAIPODS_API_KEY=<the account's API key>` to your shell profile and start a new Claude Code session from that shell, for 50/day (a new account searches at the anonymous level for its first 48 hours).
 - **Free quota exhausted (50/day)**: member access (100/day) is not open for sign-up; the paid-membership waitlist is at https://podlens.net/dashboard?source=askaipods#waitlist — joining records interest and does not grant membership.
 - **Skill triggers too rarely**: Front-load your prompt with the trigger phrases in `SKILL.md` description, or invoke directly with `/askaipods <query>`.
 

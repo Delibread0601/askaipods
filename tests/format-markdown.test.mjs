@@ -1,4 +1,4 @@
-// Tests for format.js renderMarkdown:
+// Tests for format.mjs renderMarkdown:
 //   R2-01 — empty-result 6-step priority ladder
 //   R2-03 — non-empty freshness banner
 //   R3-02 — expanded-empty branch appends "(corpus indexed through X)"
@@ -11,7 +11,7 @@
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { renderMarkdown } from "../src/format.js";
+import { renderMarkdown } from "../skill/askaipods/scripts/format.mjs";
 import { validEnvelope, validResult } from "./helpers.mjs";
 
 // Builders — concise mutations of the base valid envelope.
@@ -452,5 +452,62 @@ describe("renderMarkdown — result rendering", () => {
     const midIdx = out.indexOf("> MID");
     const oldIdx = out.indexOf("> OLD");
     assert.ok(newIdx > 0 && newIdx < midIdx && midIdx < oldIdx, "expected date-desc ordering in output");
+  });
+});
+
+describe("renderMarkdown — server strings cannot inject terminal or markdown structure", () => {
+  test("title line breaks are folded, so a title cannot open a heading", () => {
+    const env = validEnvelope({
+      total: 1,
+      results: [validResult({ episode_title: "Ep 1\n# Injected heading", podcast_name: "Pod\r\n## Also" })],
+    });
+    const out = renderMarkdown("q", env);
+    assert.match(out, /### 1\. Pod ## Also — Ep 1 # Injected heading/);
+    assert.doesNotMatch(out, /^#{1,2} (Injected|Also)/m);
+  });
+
+  test("ESC / C1 control characters and bidi overrides are removed from every printed field", () => {
+    const env = validEnvelope({
+      total: 1,
+      results: [
+        validResult({
+          text: "red \u001b[31mtext\u001b]8;;https://evil.example\u0007link\u009b",
+          episode_title: "Ep \u202Etxt.exe",
+          podcast_name: "Pod\u0007",
+        }),
+      ],
+    });
+    const out = renderMarkdown("q\u001b[2J", env);
+    assert.doesNotMatch(out, /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/);
+    assert.match(out, /# askaipods · "q \[2J"/);
+  });
+
+  test("a title that is only whitespace or control characters falls back to the placeholder", () => {
+    const env = validEnvelope({ total: 1, results: [validResult({ episode_title: "\n\u001b", podcast_name: " " })] });
+    assert.match(renderMarkdown("q", env), /### 1\. Unknown podcast — Untitled episode/);
+  });
+
+  test("quota.period (passthrough, unvalidated) cannot inject into the header", () => {
+    const env = validEnvelope({ meta: { tier: "anonymous", quota: { used: 1, limit: 20, period: "daily\u001b]8;;x\u0007\n# y" } } });
+    const out = renderMarkdown("q", env);
+    assert.doesNotMatch(out, /\u001b|\u0007/);
+    assert.doesNotMatch(out, /^# y/m);
+  });
+
+  test("downgrade reason and warning code are printed on one line, controls removed", () => {
+    const env = validEnvelope({
+      total: 1,
+      results: [validResult()],
+      meta: {
+        tier: "anonymous",
+        quota: { used: 1, limit: 20 },
+        downgraded: { from: "free", reason: "odd\n# x\u001b", waitlist: "https://podlens.net/w" },
+        warning: { code: "new_code\n## y" },
+      },
+    });
+    const out = renderMarkdown("q", env);
+    assert.match(out, /\(reason: odd # x\)/);
+    assert.match(out, /\(code: new_code ## y\)/);
+    assert.doesNotMatch(out, /^#{1,2} [xy]/m);
   });
 });
