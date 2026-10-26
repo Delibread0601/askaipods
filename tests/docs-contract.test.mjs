@@ -65,7 +65,7 @@ describe("R7-03 — `npx -y askaipods` in SKILL.md and install guides", () => {
 
 describe("Codex CLI skill path — ~/.agents/skills/ (current Codex docs)", () => {
   // The Codex skills docs list $HOME/.agents/skills as the user-level
-  // location (earlier releases read ~/.codex/skills/); OpenClaw reads the
+  // location (current releases also still read the older ~/.codex/skills/); OpenClaw reads the
   // same directory, so one install serves both.
   test("README and the Codex guide install into ~/.agents/skills/", () => {
     for (const p of ["README.md", "examples/codex-install.md"]) {
