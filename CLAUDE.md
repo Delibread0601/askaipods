@@ -12,6 +12,8 @@ This rule applies to the GitHub release body only — not to git commit messages
 
 ## Release workflow
 
+Run this workflow only when the user asks for a release; that request covers steps 3-4, and step 5 stays the user's.
+
 1. **Bump the version in four locations** (all four must match, every time; `npm test` enforces it):
    - `package.json` `"version"`
    - `skill/askaipods/scripts/cli.mjs` `const VERSION = "..."`
