@@ -159,7 +159,7 @@ These are not bugs. The skill surfaces them honestly so neither you nor your age
 
 - **No download when an agent searches.** The skill runs the CLI bundled in its own folder with `node`; nothing is fetched from npm at run time. If only `SKILL.md` is available, the agent falls back to an exact pinned release (`npx -y askaipods@<version>`), never an unpinned or `@latest` one.
 - **One network destination.** A search needs Node.js 18.3.0+ and outbound HTTPS to `podlens.net` — nothing else. It installs nothing and writes no files, so it runs in a read-only or network-allowlisted sandbox once `podlens.net` is allowed (the `npx` fallback also needs `registry.npmjs.org` and a writable npm cache). In a sandbox that routes traffic through a proxy (`HTTPS_PROXY`, as Claude Code's does), Node's fetch uses that proxy only with `NODE_USE_ENV_PROXY=1` (Node 22.21+ or 24+); the error message says so when it applies. When the network is blocked, the error names the cause code (e.g. `ENOTFOUND`) and the skill tells the agent to ask for network approval instead of retrying.
-- **Results are untrusted text.** Quotes come from third-party podcast content. The skill tells the agent to treat them as data — never follow instructions inside them — and to link only the YouTube URLs the CLI has validated. The CLI's markdown output strips control characters and line breaks from every server field.
+- **Results are untrusted text.** Quotes come from third-party podcast content. The skill tells the agent to treat them as data — never follow instructions inside them — and to link only the YouTube URLs the CLI has validated. The CLI's markdown output strips control characters and line breaks from every server field, and its error messages do the same for text the server supplies.
 - **Keys stay out of commands.** The key is read from `ASKAIPODS_API_KEY`; the skill never puts it on a command line.
 
 See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill specification.
@@ -177,7 +177,8 @@ askaipods/
 │       ├── askaipods.mjs  ← entry (shebang)
 │       ├── cli.mjs        ← arg parsing, format auto-detection
 │       ├── client.mjs     ← podlens.net /api/search/semantic client
-│       └── format.mjs     ← time-desc sort + JSON / markdown rendering
+│       ├── format.mjs     ← time-desc sort + JSON / markdown rendering
+│       └── shared.mjs     ← waitlist link + terminal-safe text, for client and format
 ├── examples/              ← per-runtime install guides
 ├── package.json           ← zero dependencies (Node 18.3.0+ stdlib only)
 ├── LICENSE                ← MIT

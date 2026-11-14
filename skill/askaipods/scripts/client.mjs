@@ -8,6 +8,8 @@
 // `search()`, so status mapping and envelope validation are covered
 // without the CLI layer.
 
+import { WAITLIST_URL, oneLine } from "./shared.mjs";
+
 const PODLENS_ENDPOINT = "https://podlens.net/api/search/semantic";
 
 // Hard caps mirror the server's own validation in
@@ -16,17 +18,11 @@ const PODLENS_ENDPOINT = "https://podlens.net/api/search/semantic";
 const MAX_QUERY_LEN = 300;
 const MIN_QUERY_LEN = 1;
 
-// Closed enums of the three-tier server contract. `meta.tier` stays the
-// legacy two-value field (any non-member caller, including free, reads
-// "anonymous"); `meta.access_tier` carries the real tier on servers that
-// send it.
-const LEGACY_TIERS = new Set(["anonymous", "member"]);
+// Closed enums of the three-tier server contract. `meta.access_tier`
+// carries the tier. The server also still sends a legacy two-value
+// `meta.tier` for old clients; this client neither reads nor validates it.
 const ACCESS_TIERS = new Set(["anonymous", "free", "member"]);
 export const SORT_VALUES = new Set(["recency", "relevance"]);
-
-// Paid-membership waitlist on the PodLens dashboard. Used in 429 copy
-// when the server did not supply its own waitlist link.
-const WAITLIST_URL = "https://podlens.net/dashboard?source=askaipods#waitlist";
 
 export class AskaipodsError extends Error {
   constructor(message, exitCode) {
@@ -44,48 +40,42 @@ function isPlainObject(v) {
   return v !== null && typeof v === "object" && !Array.isArray(v);
 }
 
-// Strict calendar validation for published_at. Accepts only the three
-// documented shapes, validates all numeric components against calendar
-// and clock bounds, and round-trips via Date.UTC to catch impossible
-// day/month combinations (Feb 30 etc). Timezone offset is required
-// whenever a time component is present — a timezone-less datetime like
-// "2025-10-15T12:00:00" would be ambiguous (Date.parse interprets it
-// in the system's local timezone, making sort order non-deterministic
-// across machines). Format: Z or ±HH:MM (colonized), hour bounded
-// 0-14, minute bounded 0-59.
+// True when year-month-day names a real calendar day. Date.UTC rolls an
+// out-of-range month or day over into a neighbouring one (month 13 →
+// January of the next year, Feb 30 → Mar 2) and maps years 0-99 to
+// 1900-1999, so comparing the round trip rejects all of them.
+function isCalendarDate(year, month, day) {
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  return dt.getUTCFullYear() === year && dt.getUTCMonth() === month - 1 && dt.getUTCDate() === day;
+}
+
+// Strict validation for published_at. Accepts a full date (YYYY-MM-DD)
+// or a full timestamp with an offset, from 1970 on; the date must be a
+// real calendar day and the time within clock bounds.
+// Timezone offset is required whenever a time component is present — a
+// timezone-less datetime like "2025-10-15T12:00:00" would be ambiguous
+// (Date.parse interprets it in the system's local timezone, making sort
+// order non-deterministic across machines). Format: Z or ±HH:MM
+// (colonized), hour bounded 0-14, minute bounded 0-59.
 const PUBLISHED_AT_SHAPE =
-  /^(\d{4})-(\d{2})(?:-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2}))?)?$/;
+  /^(\d{4})-(\d{2})-(\d{2})(?:T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}:\d{2}))?$/;
 function isValidPublishedAt(v) {
   if (v == null) return true;
   if (typeof v !== "string") return false;
   const parts = v.match(PUBLISHED_AT_SHAPE);
   if (!parts) return false;
   const year = Number(parts[1]);
-  const month = Number(parts[2]);
-  if (year < 1970 || year > 9999) return false;
-  if (month < 1 || month > 12) return false;
-  if (parts[3] !== undefined) {
-    const day = Number(parts[3]);
-    if (day < 1 || day > 31) return false;
-    const dt = new Date(Date.UTC(year, month - 1, day));
-    if (
-      dt.getUTCFullYear() !== year ||
-      dt.getUTCMonth() !== month - 1 ||
-      dt.getUTCDate() !== day
-    ) {
-      return false;
-    }
-    if (parts[4] !== undefined) {
-      const hh = Number(parts[4]);
-      const mm = Number(parts[5]);
-      const ss = Number(parts[6]);
-      if (hh > 23 || mm > 59 || ss > 59) return false;
-      if (parts[7] !== undefined && parts[7] !== "Z") {
-        // parts[7] is "±HH:MM" (enforced by regex). Check offset bounds.
-        const offHh = Number(parts[7].slice(1, 3));
-        const offMm = Number(parts[7].slice(4, 6));
-        if (offHh > 14 || offMm > 59) return false;
-      }
+  if (year < 1970 || !isCalendarDate(year, Number(parts[2]), Number(parts[3]))) return false;
+  if (parts[4] !== undefined) {
+    const hh = Number(parts[4]);
+    const mm = Number(parts[5]);
+    const ss = Number(parts[6]);
+    if (hh > 23 || mm > 59 || ss > 59) return false;
+    if (parts[7] !== "Z") {
+      // parts[7] is "±HH:MM" (enforced by regex). Check offset bounds.
+      const offHh = Number(parts[7].slice(1, 3));
+      const offMm = Number(parts[7].slice(4, 6));
+      if (offHh > 14 || offMm > 59) return false;
     }
   }
   return true;
@@ -120,8 +110,11 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                `${url}&t=${anchor_s}s` — otherwise both
 //                                are set to null in place
 //   data.meta                  : non-array object
-//   data.meta.tier             : closed enum {"anonymous","member"} (legacy
-//                                two-value field; free reads "anonymous")
+//   data.meta.access_tier      : closed enum {"anonymous","free","member"};
+//                                drives the structured `tier` and the tier
+//                                notes
+//   data.meta.sort             : {requested, served}, both in
+//                                {"recency","relevance"}; drives render_hint
 //   data.meta.quota            : non-array object
 //   data.meta.quota.used       : finite number
 //   data.meta.quota.limit      : finite number
@@ -144,13 +137,6 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                 no render logic depends on its shape,
 //                                 but reject non-object so downstream
 //                                 type assumptions hold)
-//   data.meta.access_tier       — closed enum {"anonymous","free","member"}
-//                                 iff present (absent on servers that
-//                                 predate the free tier); drives the
-//                                 structured `tier` and the tier notes
-//   data.meta.sort              — {requested, served}, both in
-//                                 {"recency","relevance"}, iff present;
-//                                 drives render_hint
 //   data.meta.downgraded        — {from, reason, waitlist} strings iff
 //                                 present; drives the degrade notice
 function isValidSuccessEnvelope(data) {
@@ -191,12 +177,9 @@ function isValidSuccessEnvelope(data) {
   }
   const m = data.meta;
   if (!isPlainObject(m)) return false;
-  if (!LEGACY_TIERS.has(m.tier)) return false;
-  if (m.access_tier != null && !ACCESS_TIERS.has(m.access_tier)) return false;
-  if (m.sort != null) {
-    if (!isPlainObject(m.sort)) return false;
-    if (!SORT_VALUES.has(m.sort.requested) || !SORT_VALUES.has(m.sort.served)) return false;
-  }
+  if (!ACCESS_TIERS.has(m.access_tier)) return false;
+  if (!isPlainObject(m.sort)) return false;
+  if (!SORT_VALUES.has(m.sort.requested) || !SORT_VALUES.has(m.sort.served)) return false;
   if (m.downgraded != null) {
     if (!isPlainObject(m.downgraded)) return false;
     const d = m.downgraded;
@@ -242,29 +225,13 @@ function isValidSuccessEnvelope(data) {
     // present (references/notices.md: always string|null). An
     // absent property is a protocol break — without this presence
     // check, the `nd != null` guard below would early-exit for
-    // undefined after R4's structural/content split, letting a {}-
-    // shaped corpus_freshness leak through (R5-01).
+    // undefined, letting a {}-shaped corpus_freshness leak through.
     if (!("newest_date" in m.corpus_freshness)) return false;
     const nd = m.corpus_freshness.newest_date;
     if (nd != null) {
       if (typeof nd !== "string") return false;
-      let isoValid = /^\d{4}-\d{2}-\d{2}$/.test(nd);
-      if (isoValid) {
-        const [y, mo, d] = nd.split("-").map(Number);
-        if (mo < 1 || mo > 12 || d < 1 || d > 31) {
-          isoValid = false;
-        } else {
-          const dt = new Date(Date.UTC(y, mo - 1, d));
-          if (
-            dt.getUTCFullYear() !== y ||
-            dt.getUTCMonth() !== mo - 1 ||
-            dt.getUTCDate() !== d
-          ) {
-            isoValid = false;
-          }
-        }
-      }
-      if (!isoValid) {
+      const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(nd);
+      if (!ymd || !isCalendarDate(Number(ymd[1]), Number(ymd[2]), Number(ymd[3]))) {
         // Coerce malformed ISO content to null and continue validation.
         // Downstream format.mjs sees null and skips the freshness banner
         // suffix, matching the server's own probe-failure degradation.
@@ -276,7 +243,7 @@ function isValidSuccessEnvelope(data) {
   // but reject non-object so future render paths don't crash on a
   // primitive where they expect an object.
   if (m.cta != null && !isPlainObject(m.cta)) return false;
-  // window shape-check (R3-01): format.mjs renderMarkdown reads
+  // window shape-check: format.mjs renderMarkdown reads
   // `window.truncated`, `window.expanded`, `window.requested_days`,
   // `window.served_days` to drive the empty-result priority ladder.
   // A malformed window (e.g., `expanded: "true"` string, missing
@@ -303,24 +270,30 @@ function isValidSuccessEnvelope(data) {
   return true;
 }
 
-// Daily-quota (429) copy. Tier source, strongest first: the 429
-// envelope's `meta.downgraded` (a free request served at the anonymous
+// Server-supplied text on its way into an error message, which goes to
+// the terminal on stderr: one line, control characters and bidi overrides
+// removed (see oneLine in shared.mjs). Anything that is not a non-empty
+// string yields the fallback.
+function serverText(value, fallback) {
+  const text = typeof value === "string" ? oneLine(value) : "";
+  return text || fallback;
+}
+
+// Daily-quota (429) copy. The 429 envelope carries the same tier fields
+// as a success: `meta.downgraded` (a free request served at the anonymous
 // level — today's free-tier capacity ran out, or the account is younger
-// than 48 hours), then its `meta.access_tier`, then — for servers that
-// send neither — the X-RateLimit-Limit header naming the quota that was
-// actually applied (20 / 50 / 100), then whether a key was sent.
+// than 48 hours) wins, then `meta.access_tier`. A 429 with neither gets a
+// tier-neutral message instead of a guess.
 //
 // The anonymous level has two caps: 20/day per IP and, for IPv6 callers,
 // 200/day across the whole /48 network (podlens-site
 // ANON_V6_SITE_DAILY_LIMIT). Both answer the same 429; only the binding
-// limit — `meta.quota.limit`, else X-RateLimit-Limit — tells them apart.
+// limit in `meta.quota.limit` tells them apart.
 const ANON_V6_NETWORK_DAILY_LIMIT = 200;
 
-function quotaExhaustedMessage(meta, limitHeader, apiKey) {
+function quotaExhaustedMessage(meta, apiKey) {
   const reset = "Quota resets at 00:00 UTC.";
-  const limit =
-    isPlainObject(meta?.quota) && typeof meta.quota.limit === "number" ? meta.quota.limit : Number(limitHeader);
-  const network = limit === ANON_V6_NETWORK_DAILY_LIMIT;
+  const network = isPlainObject(meta?.quota) && meta.quota.limit === ANON_V6_NETWORK_DAILY_LIMIT;
   const level = network ? "20/day per IP, 200/day per IPv6 /48 network" : "20/day per IP";
   const usedUp = network ? "the network's shared 200/day is used up" : "that quota is used up";
   const anonTier = network ? `${level}; ${usedUp}` : level;
@@ -334,7 +307,7 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
       );
     }
     if (reason === "free_pool_exhausted") {
-      const waitlist = typeof meta.downgraded.waitlist === "string" ? meta.downgraded.waitlist : WAITLIST_URL;
+      const waitlist = serverText(meta.downgraded.waitlist, WAITLIST_URL);
       return (
         "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
         `anonymous level — ${level} — and ${usedUp} too). ${reset} ` +
@@ -346,14 +319,9 @@ function quotaExhaustedMessage(meta, limitHeader, apiKey) {
       `and ${usedUp}). ${reset}`
     );
   }
-  let tier = ACCESS_TIERS.has(meta?.access_tier) ? meta.access_tier : null;
-  if (!tier) {
-    if (limitHeader) {
-      // Any other value — 20, or the /48 allowance's 200 — is the anonymous level.
-      tier = limitHeader === "100" ? "member" : limitHeader === "50" ? "free" : "anonymous";
-    } else {
-      tier = apiKey ? "member" : "anonymous";
-    }
+  const tier = meta?.access_tier;
+  if (!ACCESS_TIERS.has(tier)) {
+    return `daily search quota exhausted. ${reset}`;
   }
   if (tier === "member") {
     return `daily search quota exhausted (member tier: 100/day). ${reset}`;
@@ -423,16 +391,15 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     headers["X-PodLens-API-Key"] = apiKey;
   }
 
-  // `sort` is always sent (default recency). A server that predates the
-  // field ignores it; a non-member asking for relevance is served recency
-  // and says so in `meta.sort`.
+  // `sort` is always sent (default recency). A non-member asking for
+  // relevance is served recency, and `meta.sort` says so.
   const body = { q: query, sort: sort ?? "recency" };
   if (typeof days === "number" && days > 0) {
     body.days = days;
   }
 
-  // 30s total budget covers both connection setup and body consumption
-  // (audit R7-02). podlens.net edge workers may take 5-10s for the
+  // 30s total budget covers both connection setup and body consumption.
+  // podlens.net edge workers may take 5-10s for the
   // Vectorize + Gemini embed round-trip on cold starts; 30s leaves
   // comfortable headroom while still producing a deterministic
   // exit-3 instead of hanging a CLI invocation indefinitely on a
@@ -472,11 +439,13 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     let hint = "";
     if (code && NETWORK_BLOCK_CODES.has(code)) {
       // Proxy-based sandboxes (Claude Code's among them) allow traffic only
-      // through the proxy named in HTTPS_PROXY, and Node's fetch ignores
-      // that variable unless NODE_USE_ENV_PROXY=1 (Node 22.21+ / 24+).
-      const proxied = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"].some((k) => process.env[k]);
-      hint = proxied && process.env.NODE_USE_ENV_PROXY !== "1"
-        ? " — HTTPS_PROXY is set but Node's fetch ignores it unless NODE_USE_ENV_PROXY=1: rerun with NODE_USE_ENV_PROXY=1 in the environment (Node 22.21+ or 24+)"
+      // through the proxy named in HTTPS_PROXY / HTTP_PROXY, and Node's fetch
+      // ignores those variables unless NODE_USE_ENV_PROXY=1 (Node 22.21+ / 24+).
+      // With that flag, Node uses HTTP_PROXY for HTTPS requests too when
+      // HTTPS_PROXY is unset, so either variable makes the rerun worthwhile.
+      const proxyVar = ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy"].find((k) => process.env[k]);
+      hint = proxyVar && process.env.NODE_USE_ENV_PROXY !== "1"
+        ? ` — ${proxyVar} is set but Node's fetch ignores it unless NODE_USE_ENV_PROXY=1: rerun with NODE_USE_ENV_PROXY=1 in the environment (Node 22.21+ or 24+)`
         : " — if this runs inside a sandbox, outbound HTTPS to podlens.net may be blocked; allow podlens.net or ask the user to approve network access instead of retrying";
     }
     throw exitErr(3, `network error contacting podlens.net: ${err?.message ?? err}${code ? ` (${code})` : ""}${hint}`);
@@ -486,7 +455,7 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
   // paths (see jsonResponse() in functions/api/search/semantic.ts), so
   // a non-JSON body means an upstream proxy/CDN is in the way.
   //
-  // Two distinct failure classes in this catch (audit R8-01):
+  // Two distinct failure classes in this catch:
   //   1. TimeoutError/AbortError — headers arrived in time but the
   //      body read stalled past the signal's 30s budget. The same
   //      AbortSignal attached at fetch() propagates to the response
@@ -520,7 +489,7 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     if (!isValidSuccessEnvelope(data)) {
       throw exitErr(
         3,
-        "unexpected response shape from podlens.net (envelope, results entries, meta.tier / access_tier / sort / downgraded, or meta.quota failed contract validation). Retry in a moment.",
+        "unexpected response shape from podlens.net (envelope, results entries, meta.access_tier / sort / downgraded, or meta.quota failed contract validation). Retry in a moment.",
       );
     }
     return data;
@@ -535,14 +504,17 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     const msg = String(data?.error ?? "").toLowerCase();
     if (msg.includes("quota")) {
       const meta = isPlainObject(data) && isPlainObject(data.meta) ? data.meta : null;
-      const limit = response.headers?.get?.("x-ratelimit-limit");
-      throw exitErr(2, quotaExhaustedMessage(meta, limit, apiKey));
+      throw exitErr(2, quotaExhaustedMessage(meta, apiKey));
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");
   }
 
+  // The server's own error text, else the HTTP status text — both are
+  // remote strings, so both go through serverText.
+  const errorText = serverText(data?.error, serverText(response.statusText, "no detail given"));
+
   if (response.status === 401 || response.status === 403) {
-    throw exitErr(1, `API key rejected: ${data?.error ?? response.statusText}`);
+    throw exitErr(1, `API key rejected: ${errorText}`);
   }
 
   if (response.status === 413) {
@@ -553,12 +525,12 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     if (CAPACITY_REACHED.test(String(data?.error ?? ""))) {
       throw exitErr(2, capacityReachedMessage());
     }
-    throw exitErr(3, `podlens.net temporarily unavailable: ${data?.error ?? "service unavailable"}`);
+    throw exitErr(3, `podlens.net temporarily unavailable: ${serverText(data?.error, "service unavailable")}`);
   }
 
   if (response.status === 400) {
-    throw exitErr(1, `invalid request: ${data?.error ?? "bad request"}`);
+    throw exitErr(1, `invalid request: ${serverText(data?.error, "bad request")}`);
   }
 
-  throw exitErr(3, `podlens.net error (HTTP ${response.status}): ${data?.error ?? response.statusText}`);
+  throw exitErr(3, `podlens.net error (HTTP ${response.status}): ${errorText}`);
 }

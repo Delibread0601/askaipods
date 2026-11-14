@@ -120,6 +120,7 @@ A member response to `--sort relevance --days 7` that widened its window:
     "total_returned": 1,
     "quota": { "used": 3, "limit": 100, "period": "daily", "next_reset": "2026-10-03T00:00:00Z" },
     "restrictions": { "max_days": 365 },
+    "query_hash": "<opaque hex string>",
     "window": { "requested_days": 7, "served_days": 90, "expanded": true, "attempted_days": [7, 30, 60, 90], "reason_code": "expanded_partial_fill" },
     "warning": null,
     "corpus_freshness": { "newest_date": "2026-10-01" },
@@ -149,7 +150,7 @@ Output exactly this structure so every runtime shows the same shape. Replace `<p
 
 **Banners** — one italic line each, before the first heading, in this order: freshness and window-expansion notes, then ordering, then degrade:
 
-- `sort` is non-null AND `sort.served !== sort.requested` → `*Note: Relevance ordering is a member feature, so these results were selected by recency (newest first).*`
+- `sort.served !== sort.requested` → `*Note: Relevance ordering is a member feature, so these results were selected by recency (newest first).*`
 - `downgraded` is non-null → one note chosen by `downgraded.reason`, and no closing tier note:
   - `"new_account"` → `*Note: New free accounts search at the anonymous level for their first 48 hours, so this search ran at the anonymous level (30-day --days cap, 20 searches/day per IP). The free tier (50 searches/day, --days up to 90) applies once the account is 48 hours old.*`
   - `"free_pool_exhausted"` → `*Note: Today's free-tier capacity is used up, so this search ran at the anonymous level (30-day --days cap, 20 searches/day per IP). Paid-membership waitlist: <downgraded.waitlist> — joining records interest; it does not grant membership.*`
@@ -229,7 +230,7 @@ Avoid generic observations, restating quotes, claims about who said what, and mu
 |---|---|---|
 | `0` | Success | Render the results normally |
 | `1` | Usage error / invalid arguments / API key rejected | Surface the stderr message verbatim (e.g. query over 300 characters, empty query, key rejected). |
-| `2` | Daily quota exhausted, or podlens.net's daily anonymous-level capacity reached | Do not retry at the same tier before 00:00 UTC (a free account in its first 48 hours moves up when it turns 48 hours old). Surface stderr verbatim — it is tier-aware and names the reset time and next step. |
+| `2` | Daily quota exhausted, or podlens.net's daily anonymous-level capacity reached | Do not retry at the same tier before 00:00 UTC (a free account in its first 48 hours moves up when it turns 48 hours old). Surface stderr verbatim — it names the reset time and, when known, the limit that was hit and any next step. |
 | `3` | Transient or unexpected failure (network error, rate-limit burst, transient service 503, protocol/shape error, or internal exception) | Network error with a sandbox hint → see §Sandboxes and network, no retry loop. "rate limited … Retry in a minute" → wait about a minute, retry once. Anything else → retry once after a brief pause. If it fails again, surface stderr verbatim. |
 
 Never silently swallow an error, and never fabricate quotes when the API returns nothing.

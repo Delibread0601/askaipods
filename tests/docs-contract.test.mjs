@@ -1,14 +1,12 @@
 // Contract tests for shipped documentation. Cheap static checks so the
-// doc-only ledger items from v0.2.5 convergence (R7-03 `npx -y`, R7-04
-// Codex CLI path) cannot silently regress in a future edit.
-//
-// Scope excludes R2-04 (README 'Results returned' row rewrite): the
-// rewrite was a one-time copy change with no stable contract text to
-// pin without over-coupling to English phrasing.
+// facts the docs must keep (`npx -y`, the Codex CLI path, tier caps,
+// exit codes, security guidance) cannot silently regress in a future
+// edit. Free-form copy with no stable contract text (e.g. the README
+// "Results returned" row) is deliberately not pinned.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
@@ -30,7 +28,7 @@ function codeBlockText(md) {
   return Array.from(matches, (m) => m[1]).join("\n");
 }
 
-describe("R7-03 — `npx -y askaipods` in SKILL.md and install guides", () => {
+describe("`npx -y askaipods` in SKILL.md and install guides", () => {
   const INSTALL_GUIDES = [
     "skill/askaipods/SKILL.md",
     "examples/codex-install.md",
@@ -40,12 +38,12 @@ describe("R7-03 — `npx -y askaipods` in SKILL.md and install guides", () => {
   ];
 
   for (const p of INSTALL_GUIDES) {
-    test(`${p} uses \`npx -y askaipods\` AND no code-block invocation omits -y (R14-01 negative guard)`, () => {
+    test(`${p} uses \`npx -y askaipods\` AND no code-block invocation omits -y`, () => {
       const body = read(p);
       assert.match(
         body,
         /npx -y askaipods/,
-        "install docs must use `npx -y` to bypass npm's first-run confirmation prompt (R7-03)",
+        "install docs must use `npx -y` to bypass npm's first-run confirmation prompt",
       );
       // Negative guard scoped to fenced code blocks only. Narrative
       // mentions like "`npx askaipods` fails" in troubleshooting bullets
@@ -57,7 +55,7 @@ describe("R7-03 — `npx -y askaipods` in SKILL.md and install guides", () => {
       assert.doesNotMatch(
         strippedCorrect,
         /npx askaipods/,
-        "no code-block invocation of `npx askaipods` may omit `-y` — non-TTY runtimes hang on first-run confirmation (R7-03)",
+        "no code-block invocation of `npx askaipods` may omit `-y` — non-TTY runtimes hang on first-run confirmation",
       );
     });
   }
@@ -85,13 +83,13 @@ describe("Codex CLI skill path — ~/.agents/skills/ (current Codex docs)", () =
 });
 
 
-describe("R7-01 — SKILL.md argv-safety rule present", () => {
+describe("SKILL.md argv-safety rule present", () => {
   test("SKILL.md documents the argv-array invocation form", () => {
     const body = read("skill/askaipods/SKILL.md");
     // Two contract anchors:
     //   (1) the explicit argv-safety warning
     //   (2) the argv-array form `[..., "--", "<USER QUERY>"]` with `--` separator
-    assert.match(body, /argv-safety/i, "SKILL.md must document the argv-safety rule (R7-01)");
+    assert.match(body, /argv-safety/i, "SKILL.md must document the argv-safety rule");
     assert.match(
       body,
       /\[\s*"node", "<skill-dir>\/scripts\/askaipods\.mjs"/,
@@ -236,6 +234,7 @@ describe("v0.3.0 — three tiers, --sort, degrade notice", () => {
     "skill/askaipods/scripts/cli.mjs",
     "skill/askaipods/scripts/client.mjs",
     "skill/askaipods/scripts/format.mjs",
+    "skill/askaipods/scripts/shared.mjs",
   ];
   for (const p of SHIPPED) {
     test(`${p} carries no invite-only / request-access wording`, () => {
@@ -267,7 +266,7 @@ describe("v0.3.0 — three tiers, --sort, degrade notice", () => {
   });
 
   test("waitlist copy never promises approval or a timeline", () => {
-    for (const p of ["skill/askaipods/SKILL.md", "README.md", "examples/claude-code-install.md", "examples/hermes-install.md"]) {
+    for (const p of ["skill/askaipods/SKILL.md", "README.md", "examples/claude-code-install.md", "examples/codex-install.md", "examples/hermes-install.md", "examples/openclaw-install.md"]) {
       const body = read(p);
       assert.match(body, /https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/, `${p} links the waitlist`);
       assert.match(body, /does not grant membership/, `${p} says joining does not grant membership`);
@@ -300,7 +299,7 @@ describe("v0.3.2 — new-account probation and the anonymous-level capacity 503"
     const readme = read("README.md");
     assert.match(readme, /\| 50 searches per user \(anonymous level for the account's first 48 hours\) \|/);
     assert.match(readme, /50\/day and the lookback to 90 days once the account is 48 hours old/);
-    for (const p of ["examples/claude-code-install.md", "examples/hermes-install.md"]) {
+    for (const p of ["examples/claude-code-install.md", "examples/codex-install.md", "examples/hermes-install.md", "examples/openclaw-install.md"]) {
       assert.match(read(p), /50\/day \(a new account searches at the anonymous level for its first 48 hours\)/, p);
     }
     assert.match(read("skill/askaipods/scripts/cli.mjs"), /account searches at the anonymous level for its\s+first 48 hours/);
@@ -331,4 +330,21 @@ describe("v0.2.9 — corpus scope matches PodLens (AI-centred, five domains)", (
       }
     }
   });
+});
+
+describe("source files carry no invisible characters", () => {
+  // The scripts strip control and bidi characters from server text. Their
+  // own sources, and the tests, must spell such characters as escapes: a
+  // raw one cannot be seen in an editor or a diff. Cc = control characters
+  // (tab and line breaks allowed); Cf = format characters (bidi marks and
+  // overrides, zero-width characters, BOM).
+  const INVISIBLE = /[^\P{Cc}\t\n\r]|\p{Cf}/u;
+  for (const dir of ["bin", "skill/askaipods/scripts", "tests"]) {
+    for (const name of readdirSync(join(ROOT, dir))) {
+      test(`${dir}/${name}`, () => {
+        const hit = INVISIBLE.exec(read(`${dir}/${name}`));
+        assert.equal(hit, null, hit && `U+${hit[0].codePointAt(0).toString(16).toUpperCase().padStart(4, "0")} at offset ${hit.index}`);
+      });
+    }
+  }
 });

@@ -1,6 +1,5 @@
 // Tests for format.mjs: toStructured passthrough, sortByDateDesc UTC
-// comparison, and the tier / sort → render_hint contract on old and
-// three-tier servers.
+// comparison, and the tier / sort → render_hint contract.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
@@ -31,18 +30,6 @@ describe("sortByDateDesc — pure function", () => {
     assert.deepEqual(dates.slice(0, 2), ["2025-12-31", "2025-06-15"]);
     assert.equal(dates[2], null);
     assert.equal(dates[3], null);
-  });
-
-  test("legacy month-only YYYY-MM (pre-full-date servers) normalizes to YYYY-MM-01 before compare", () => {
-    const sorted = sortByDateDesc([
-      { published_at: "2025-01" },
-      { published_at: "2025-12" },
-      { published_at: "2025-06" },
-    ]);
-    assert.deepEqual(
-      sorted.map((r) => r.published_at),
-      ["2025-12", "2025-06", "2025-01"],
-    );
   });
 
   test("UTC-ms compare (NOT lex) fixes TZ-offset edge: +14 vs -12 crossing midnight", () => {
@@ -86,42 +73,28 @@ describe("sortByDateDesc — pure function", () => {
   });
 });
 
-describe("toStructured — render_hint + tier (old server: no access_tier / sort)", () => {
-  test("member tier → render_hint 'dual_view'", () => {
-    const env = validEnvelope({
-      meta: { tier: "member", quota: { used: 5, limit: 100 } },
-    });
-    const s = toStructured("q", env);
-    assert.equal(s.tier, "member");
-    assert.equal(s.render_hint, "dual_view");
-    assert.equal(s.sort, null);
-    assert.equal(s.downgraded, null);
-  });
+describe("toStructured — tier, sort and render_hint", () => {
+  const env = (meta) => validEnvelope({ meta });
 
-  test("anonymous tier → render_hint 'single_view'", () => {
+  test("default envelope: anonymous, recency → single_view, no downgrade", () => {
     const s = toStructured("q", validEnvelope());
     assert.equal(s.tier, "anonymous");
     assert.equal(s.render_hint, "single_view");
-    assert.equal(s.sort, null);
+    assert.deepEqual(s.sort, { requested: "recency", served: "recency" });
     assert.equal(s.downgraded, null);
   });
-});
 
-describe("toStructured — three-tier server (access_tier / sort / downgraded)", () => {
-  const env = (meta) =>
-    validEnvelope({ meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, ...meta } });
-
-  test("tier = meta.access_tier, not the frozen meta.tier", () => {
+  test("tier = meta.access_tier, not the server's legacy meta.tier", () => {
     const s = toStructured(
       "q",
-      env({ access_tier: "free", quota: { used: 1, limit: 50 }, sort: { requested: "recency", served: "recency" } }),
+      env({ tier: "anonymous", access_tier: "free", quota: { used: 1, limit: 50 } }),
     );
     assert.equal(s.tier, "free");
   });
 
   test("sort passes through; served relevance → dual_view", () => {
     const sort = { requested: "relevance", served: "relevance" };
-    const s = toStructured("q", env({ tier: "member", access_tier: "member", sort }));
+    const s = toStructured("q", env({ access_tier: "member", sort }));
     assert.deepEqual(s.sort, sort);
     assert.equal(s.render_hint, "dual_view");
   });
@@ -129,7 +102,7 @@ describe("toStructured — three-tier server (access_tier / sort / downgraded)",
   test("member served recency → single_view (render_hint follows sort, not tier)", () => {
     const s = toStructured(
       "q",
-      env({ tier: "member", access_tier: "member", sort: { requested: "recency", served: "recency" } }),
+      env({ access_tier: "member", sort: { requested: "recency", served: "recency" } }),
     );
     assert.equal(s.tier, "member");
     assert.equal(s.render_hint, "single_view");
@@ -280,7 +253,6 @@ describe("toStructured — meta passthrough", () => {
   test("quota passes through untouched", () => {
     const env = validEnvelope({
       meta: {
-        tier: "anonymous",
         quota: {
           used: 3,
           limit: 20,
@@ -317,7 +289,6 @@ describe("toStructured — meta passthrough", () => {
   test("warning / corpus_freshness / cta pass through when present", () => {
     const env = validEnvelope({
       meta: {
-        tier: "anonymous",
         quota: { used: 1, limit: 20 },
         warning: { code: "index_metadata_stale" },
         corpus_freshness: { newest_date: "2026-04-15" },

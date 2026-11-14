@@ -46,4 +46,4 @@ If `meta.quota.refunded === true`, end with: "_This search was refunded — it d
 - **`meta.window`** — `{ requested_days, served_days, expanded, attempted_days?, reason_code?, truncated? }`, or `null`. `requested_days` is the window applied (the `--days` value capped at the tier max, or the tier max); `served_days` is the last window whose query completed; `reason_code` (`expanded_topk_filled` / `expanded_partial_fill` / `exhausted_windows_empty`) is diagnostic.
 - **`meta.corpus_freshness`** — `{ newest_date: "YYYY-MM-DD" | null }`, the newest indexed episode; render `null` as "date unknown".
 - **`meta.cta`** — `null`, or a non-member call to action: anonymous `{ follow: "<url>" }` (safe to ignore), free `{ waitlist: "<url>" }` (used in the free closing note).
-- **`sort`** — `null` on a server that predates the field; `render_hint` already accounts for it.
+- **`meta.query_hash`** — an opaque hash of the query that the server keeps for its own logs, or `null`. Not needed for rendering; never show it.

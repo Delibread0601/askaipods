@@ -2,8 +2,7 @@
 //
 // We stub `globalThis.fetch` per-test instead of reaching for a library.
 // The production code only uses `.ok`, `.status`, `.statusText`, `.json()`
-// and (on a 429) `.headers.get()` from the Response, so a plain object is
-// enough.
+// from the Response, so a plain object is enough.
 
 // Snapshot the real fetch once at module load. Per-test restore then
 // always resets to the native implementation, not to whatever
@@ -12,7 +11,7 @@
 // around a test that never mocked fetch (e.g., input-validation tests that
 // throw before the HTTP call) would cascade `undefined` forward and make
 // subsequent mocks record `undefined` as the "original" — order-dependent
-// flakiness (R13-01).
+// flakiness.
 const _nativeFetch = globalThis.fetch;
 
 export function installFetchMock(factory) {
@@ -25,14 +24,13 @@ export function restoreFetch() {
 
 // Returns a fetch stub that resolves with the given status + body. Records
 // every call so tests can assert on the outgoing request shape.
-export function mockResponse({ status = 200, body = {}, statusText, headers = {} } = {}) {
+export function mockResponse({ status = 200, body = {}, statusText } = {}) {
   const calls = [];
   const fetchFn = async (url, init) => {
     calls.push({ url, init });
     return {
       ok: status >= 200 && status < 300,
       status,
-      headers: { get: (name) => headers[name.toLowerCase()] ?? null },
       statusText: statusText ?? (status >= 200 && status < 300 ? "OK" : "Error"),
       async json() {
         return body;
@@ -55,7 +53,7 @@ export function mockTimeoutFetch(name = "TimeoutError") {
 }
 
 // fetch stub that returns headers OK but throws on body read — exercises
-// the R8-01 distinction between header-phase and body-phase timeouts.
+// the distinction between header-phase and body-phase timeouts.
 export function mockBodyReadTimeoutFetch(name = "TimeoutError") {
   installFetchMock(async () => ({
     ok: true,
@@ -91,18 +89,21 @@ export function mockNetworkErrorFetch(message = "fetch failed", cause) {
   });
 }
 
-// Minimal valid success envelope. Tests spread onto this and mutate fields
-// to exercise individual validator branches without re-writing the whole
-// shape each time.
+// Minimal valid success envelope. Top-level overrides replace; `meta`
+// overrides merge over the base meta, so a test names only the fields it
+// exercises (pass `undefined` to make a required field absent). A body
+// whose `meta` itself is missing or not an object has to be written by hand.
 export function validEnvelope(overrides = {}) {
   return {
     total: 0,
     results: [],
-    meta: {
-      tier: "anonymous",
-      quota: { used: 1, limit: 20 },
-    },
     ...overrides,
+    meta: {
+      access_tier: "anonymous",
+      sort: { requested: "recency", served: "recency" },
+      quota: { used: 1, limit: 20 },
+      ...overrides.meta,
+    },
   };
 }
 

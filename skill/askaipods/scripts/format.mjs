@@ -11,17 +11,7 @@
 // agent's job is to optionally split that into "Latest" and "Top
 // Relevant" sub-views — see SKILL.md.
 
-const WAITLIST_URL = "https://podlens.net/dashboard?source=askaipods#waitlist";
-
-// Markdown output prints server strings (podcast-derived text, titles,
-// codes) straight to a terminal. Replace control characters (an ESC
-// sequence can rewrite the screen or plant an OSC-8 hyperlink) and bidi
-// overrides, and fold line breaks so no field can open a new heading or
-// leave its quote block. JSON output keeps the raw values.
-const UNSAFE_CHARS = /[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
-function oneLine(value) {
-  return String(value).replace(UNSAFE_CHARS, " ").replace(/\s+/g, " ").trim();
-}
+import { WAITLIST_URL, oneLine } from "./shared.mjs";
 
 // The tier's --days cap as the server reported it (meta.restrictions
 // .max_days), so the copy stays right on servers with different caps.
@@ -100,18 +90,14 @@ export function clock(seconds) {
 // newest-first contract for any member-tier response that carries
 // offset timestamps. Numeric UTC compare fixes that.
 //
-// Every tier now returns full dates (YYYY-MM-DD or a full ISO 8601
-// timestamp with offset). Older servers sent month-only YYYY-MM dates
-// for the anonymous tier, and the validator still accepts that shape;
-// Date.parse is inconsistent across engines for it, so normalize to
-// YYYY-MM-01 first.
+// client.mjs accepts only full dates (YYYY-MM-DD) and full ISO 8601
+// timestamps with an offset, both of which Date.parse reads as UTC-exact.
 //
 // Nulls and any unparseable value sort to the end so absent-date
 // results don't crowd out the dated ones.
 function toUtcMs(dateStr) {
   if (!dateStr) return null;
-  const normalized = /^\d{4}-\d{2}$/.test(dateStr) ? `${dateStr}-01` : dateStr;
-  const ms = Date.parse(normalized);
+  const ms = Date.parse(dateStr);
   return Number.isNaN(ms) ? null : ms;
 }
 export function sortByDateDesc(items) {
@@ -130,49 +116,38 @@ export function sortByDateDesc(items) {
 // the agent to derive a "Top Relevant" sub-view without re-querying when
 // the server selected by relevance. When it selected by recency,
 // api_rank reflects temporal order (newest-first from the API), not
-// semantic relevance — `render_hint` flags that distinction:
-//   - `meta.sort` present (current server): dual_view iff
-//     sort.served === "relevance";
-//   - `meta.sort` absent (server that predates it): member results were
-//     always relevance-selected, anonymous ones recency-selected.
+// semantic relevance — `render_hint` flags that distinction: dual_view
+// iff `meta.sort.served === "relevance"`.
 //
 // Preconditions: `response` must be a validated success envelope from
-// `client.search()`. `client.mjs` validates `meta.tier` against its
-// closed enum and `meta.quota` as an object before returning, so we read
-// those fields directly here without a fallback. A programmatic caller
+// `client.search()`. `client.mjs` validates `meta.access_tier` and
+// `meta.sort` against their closed enums and `meta.quota` as an object
+// before returning, so we read those fields directly here without a
+// fallback. A programmatic caller
 // that bypasses client.search() and hands toStructured a malformed
 // response will get a TypeError — that's louder than a silent fallback
 // and matches the "protocol break → exit 3" philosophy of client.mjs.
 export function toStructured(query, response) {
   // These fields are guaranteed by client.mjs's success-envelope validator:
-  //   response.results (array), response.meta (object),
-  //   response.meta.tier (closed enum), response.meta.quota (object).
-  // Read them directly. The remaining fields below (total,
-  // meta.query_hash, meta.restrictions) are optional per the server
-  // contract and keep their `?? null` / fallback defenses.
-  //
-  // `tier` is the effective tier: `meta.access_tier` (anonymous / free /
-  // member) when the server sends it, else the legacy two-value
-  // `meta.tier`.
-  const tier = response.meta.access_tier ?? response.meta.tier;
-  const sort = response.meta.sort ?? null;
+  //   response.results (array, each with a non-empty `text`),
+  //   response.meta (object), response.meta.access_tier (closed enum),
+  //   response.meta.sort ({requested, served}), response.meta.quota
+  //   (object). Read them directly. The remaining fields below
+  //   (meta.query_hash, meta.restrictions, ...) are optional per the
+  //   server contract and keep their `?? null` defaults.
+  const { access_tier: tier, sort } = response.meta;
   const apiResults = response.results;
 
   const withRank = apiResults.map((r, idx) => ({ ...r, api_rank: idx + 1 }));
   const sorted = sortByDateDesc(withRank);
 
-  let renderHint;
-  if (sort) renderHint = sort.served === "relevance" ? "dual_view" : "single_view";
-  else renderHint = response.meta.tier === "member" ? "dual_view" : "single_view";
-
   return {
     tier,
     query,
     fetched_at: new Date().toISOString(),
-    render_hint: renderHint,
+    render_hint: sort.served === "relevance" ? "dual_view" : "single_view",
     // { requested, served } — the ordering asked for and the one the
-    // server ran (relevance is member-only); null on servers that
-    // predate the field.
+    // server ran (relevance is member-only).
     sort,
     // { from, reason, waitlist } when a free request ran at the anonymous
     // level (reason "free_pool_exhausted": today's free-tier capacity is
@@ -192,7 +167,7 @@ export function toStructured(query, response) {
       // timestamp. client.mjs keeps them only as a consistent pair.
       anchor_s: r.anchor_s ?? null,
       anchor_url: r.anchor_url ?? null,
-      text: r.text ?? "",
+      text: r.text,
       api_rank: r.api_rank,
     })),
     meta: {
@@ -232,25 +207,18 @@ export function renderMarkdown(query, response) {
   lines.push("");
 
   const quota = data.meta.quota;
-  const tierLabel = data.tier;
-  const quotaLabel = quota
-    ? `${quota.used}/${quota.limit} ${oneLine(quota.period ?? "daily")}`
-    : "unknown";
+  const quotaLabel = `${quota.used}/${quota.limit} ${oneLine(quota.period ?? "daily")}`;
   // Server's P1-b narrow refund: when corpus is stale AND delivered
   // results are empty, the quota slot is refunded (see server CLAUDE.md
   // §Three-Tier Search Access). Surface as a trailing tag so the user
   // knows the search was free — `quota.used` is already decremented
   // upstream, so we only need the marker, not a separate count.
-  const refundedTag = data.meta.quota?.refunded ? " · refunded" : "";
-  // Served ordering, when the server reports it. A mismatch means the
-  // requested ordering is not available on this tier (relevance is
-  // member-only).
-  let sortLabel = "";
-  if (data.sort) {
-    const { requested, served } = data.sort;
-    sortLabel = requested === served ? ` · Sort: ${served}` : ` · Sort: ${served} (${requested} requested — member-only)`;
-  }
-  lines.push(`*Tier: ${tierLabel}${sortLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
+  const refundedTag = quota.refunded ? " · refunded" : "";
+  // Served ordering. A mismatch means the requested ordering is not
+  // available on this tier (relevance is member-only).
+  const { requested, served } = data.sort;
+  const sortLabel = requested === served ? served : `${served} (${requested} requested — member-only)`;
+  lines.push(`*Tier: ${data.tier} · Sort: ${sortLabel} · Results: ${data.results.length} · Quota: ${quotaLabel}${refundedTag}*`);
   lines.push("");
 
   // Degrade notice: a free request ran at the anonymous level. Shown
@@ -274,7 +242,7 @@ export function renderMarkdown(query, response) {
     // — priority ladder):
     //   1. warning.code = corpus_stale_for_requested_window
     //   2. warning.code = index_metadata_stale
-    //   3. warning.code = any other value (forward-compat, R6-01)
+    //   3. warning.code = any other value (forward-compat)
     //   4. window.truncated (transient fallback error — retry)
     //   5. window.expanded (API widened the window, still empty)
     //   6. generic (no signal — likely semantic mismatch)
@@ -294,8 +262,8 @@ export function renderMarkdown(query, response) {
         "No results. Recently indexed episodes are still propagating to the search index — retry in a few minutes.",
       );
     } else if (warningCode) {
-      // Forward-compat: server may introduce new warning codes (audit
-      // R6-01). Preserve the signal rather than silently falling
+      // Forward-compat: server may introduce new warning codes.
+      // Preserve the signal rather than silently falling
       // through to generic "rephrase" copy, which would mislead the
       // user into thinking the empty result is their fault.
       lines.push(
@@ -348,7 +316,7 @@ export function renderMarkdown(query, response) {
     );
     lines.push("");
   } else if (warningCode) {
-    // Unknown server warning code (forward-compat, audit R6-01).
+    // Unknown server warning code (forward-compat).
     // Surface the raw code so the signal reaches the user rather
     // than being silently dropped.
     lines.push(
@@ -388,7 +356,7 @@ export function renderMarkdown(query, response) {
     lines.push(line);
     lines.push("");
     // Quote-block the text on one line so the markdown stays compact.
-    const text = oneLine(r.text ?? "");
+    const text = oneLine(r.text);
     lines.push(`> ${text}`);
     lines.push("");
   }

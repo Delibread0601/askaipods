@@ -1,6 +1,6 @@
-// Tests for client.mjs status → exit-code mapping, 429 tier-aware message
-// (old and new server shapes),
-// and the R7-02 / R8-01 timeout / body-read distinction.
+// Tests for client.mjs status → exit-code mapping, the tier-aware 429
+// message, terminal-safe server text, and the timeout / body-read
+// distinction.
 
 import { test, describe, afterEach } from "node:test";
 import assert from "node:assert/strict";
@@ -40,7 +40,7 @@ describe("search — happy path", () => {
   test("valid envelope returns data unchanged", async () => {
     mockResponse({ body: validEnvelope() });
     const data = await search({ query: "hi", endpoint: "https://mock/" });
-    assert.equal(data.meta.tier, "anonymous");
+    assert.equal(data.meta.access_tier, "anonymous");
   });
 
   test("sends q + days in body; Content-Type, User-Agent, X-PodLens-API-Key headers set when key provided", async () => {
@@ -82,7 +82,7 @@ describe("search — happy path", () => {
     );
   });
 
-  test("User-Agent advertises the EXACT current version from package.json (R13-03 version-bump parity)", async () => {
+  test("User-Agent advertises the EXACT current version from package.json (version-bump parity)", async () => {
     // Semver-shape regex would pass for any version. Pin the exact string
     // read from package.json so a forgotten bump in client.mjs fails here.
     const calls = mockResponse({ body: validEnvelope() });
@@ -93,8 +93,8 @@ describe("search — happy path", () => {
     );
   });
 
-  test("calls AbortSignal.timeout(30000) and passes that signal to fetch (R7-02 full timeout-budget guard, R16-01)", async () => {
-    // Defense-in-depth (R13-02 + R16-01): the timeout-classification tests
+  test("calls AbortSignal.timeout(30000) and passes that signal to fetch (full timeout-budget guard)", async () => {
+    // Defense-in-depth: the timeout-classification tests
     // fabricate TimeoutError from the mock, so they don't exercise the
     // real timeout wiring. Just asserting `signal instanceof AbortSignal`
     // is also insufficient — a regression to `new AbortController().signal`
@@ -202,7 +202,6 @@ describe("search — HTTP error → exit-code mapping", () => {
     mockResponse({
       status: 503,
       body: { error: "Service temporarily unavailable" },
-      headers: { "retry-after": "30" },
     });
     const err = await runAndCatch();
     assert.equal(err.exitCode, 3);
@@ -226,90 +225,47 @@ describe("search — HTTP error → exit-code mapping", () => {
 describe("search — 429 tier-aware quota messaging", () => {
   afterEach(restoreFetch);
 
-  // Older server shape: no meta.access_tier / meta.downgraded on the 429
-  // envelope, so the X-RateLimit-Limit header (or, without it, whether a
-  // key was sent) decides the copy.
-  test("old server: 429 quota, no apiKey → exit 2, anonymous message with the free sign-in path", async () => {
-    mockResponse({
-      status: 429,
-      body: { error: "daily quota exhausted for anonymous tier" },
-    });
+  // The 429 envelope carries the same tier fields as a success
+  // (access_tier, quota, and downgraded for a degraded free request).
+  const quota429 = (meta) => ({ status: 429, body: { error: "Daily search quota exhausted", meta } });
+
+  test("429 quota without meta → exit 2, tier-neutral message (no guess from the key)", async () => {
+    for (const opts of [{}, { apiKey: "k1" }]) {
+      mockResponse({ status: 429, body: { error: "Daily search quota exhausted" } });
+      const err = await runAndCatch(opts);
+      assert.equal(err.exitCode, 2);
+      assert.equal(err.message, "daily search quota exhausted. Quota resets at 00:00 UTC.");
+    }
+  });
+
+  test("unknown access_tier → tier-neutral message", async () => {
+    mockResponse(quota429({ access_tier: "gold", quota: { used: 20, limit: 20 } }));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, "daily search quota exhausted. Quota resets at 00:00 UTC.");
+  });
+
+  test("access_tier anonymous with a key → anonymous message naming the key", async () => {
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 20, limit: 20 } }));
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /anonymous tier: 20\/day per IP — this API key was served as anonymous/);
+    assert.doesNotMatch(err.message, /member tier|free tier|invite/i);
+  });
+
+  test("access_tier anonymous, no key → anonymous message with the free sign-in path", async () => {
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 20, limit: 20 } }));
     const err = await runAndCatch();
     assert.equal(err.exitCode, 2);
-    assert.match(err.message, /anonymous tier: 20\/day per IP/);
+    assert.match(err.message, /anonymous tier: 20\/day per IP\)/);
     assert.match(err.message, /sign in free with Google or GitHub at https:\/\/podlens\.net/);
     assert.match(err.message, /50 searches\/day/);
     assert.match(err.message, /ASKAIPODS_API_KEY/);
     assert.doesNotMatch(err.message, /invite/i);
   });
 
-  test("old server: 429 quota WITH apiKey and no header → member message, no sign-in path", async () => {
-    mockResponse({
-      status: 429,
-      body: { error: "daily quota exhausted for member tier" },
-    });
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.equal(err.exitCode, 2);
-    assert.match(err.message, /member tier: 100\/day/i);
-    // Member tier must NOT be told to sign in or set a key — they already have one.
-    assert.doesNotMatch(err.message, /ASKAIPODS_API_KEY|sign in|waitlist/i);
-    assert.doesNotMatch(err.message, /invite/i);
-  });
-
-  test("old server: 429 quota with a key served as anonymous (X-RateLimit-Limit 20) → anonymous message naming the key", async () => {
-    mockResponse({
-      status: 429,
-      body: { error: "Daily search quota exhausted" },
-      headers: { "x-ratelimit-limit": "20" },
-    });
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.equal(err.exitCode, 2);
-    assert.match(err.message, /anonymous tier: 20\/day per IP — this API key was served as anonymous/);
-    assert.doesNotMatch(err.message, /member tier: 100\/day/);
-    assert.doesNotMatch(err.message, /invite/i);
-  });
-
-  test("old server: 429 quota with X-RateLimit-Limit 100 → member message", async () => {
-    mockResponse({
-      status: 429,
-      body: { error: "Daily search quota exhausted" },
-      headers: { "x-ratelimit-limit": "100" },
-    });
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.match(err.message, /member tier: 100\/day/);
-  });
-
-  test("429 quota with X-RateLimit-Limit 50 and no access_tier → free message", async () => {
-    mockResponse({
-      status: 429,
-      body: { error: "Daily search quota exhausted" },
-      headers: { "x-ratelimit-limit": "50" },
-    });
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.match(err.message, /free tier: 50\/day/);
-  });
-
-  // New server shape: the 429 envelope's meta carries access_tier (and
-  // downgraded for a degraded free request), which wins over the header.
-  function newServer429(meta, limit) {
-    return {
-      status: 429,
-      body: { error: "Daily search quota exhausted", meta },
-      headers: { "x-ratelimit-limit": String(limit) },
-    };
-  }
-
-  test("new server: access_tier anonymous, no key → anonymous message with the free sign-in path", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
-    const err = await runAndCatch();
-    assert.equal(err.exitCode, 2);
-    assert.match(err.message, /anonymous tier: 20\/day per IP\)/);
-    assert.match(err.message, /sign in free with Google or GitHub at https:\/\/podlens\.net/);
-    assert.match(err.message, /50 searches\/day/);
-  });
-
-  test("new server: access_tier free → 50/day + waitlist link, no approval promise, frozen tier ignored", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "free", quota: { used: 50, limit: 50 } }, 50));
+  test("access_tier free → 50/day + waitlist link, no approval promise, frozen tier ignored", async () => {
+    mockResponse(quota429({ tier: "anonymous", access_tier: "free", quota: { used: 50, limit: 50 } }));
     const err = await runAndCatch({ apiKey: "k1" });
     assert.equal(err.exitCode, 2);
     assert.match(err.message, /free tier: 50\/day/);
@@ -318,36 +274,22 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.doesNotMatch(err.message, /anonymous tier|invite|approv/i);
   });
 
-  test("new server: access_tier member → member message", async () => {
-    mockResponse(newServer429({ tier: "member", access_tier: "member", quota: { used: 100, limit: 100 } }, 100));
+  test("access_tier member → member message", async () => {
+    mockResponse(quota429({ access_tier: "member", quota: { used: 100, limit: 100 } }));
     const err = await runAndCatch({ apiKey: "k1" });
     assert.match(err.message, /member tier: 100\/day/);
     assert.doesNotMatch(err.message, /waitlist|sign in/i);
   });
 
-  test("new server: access_tier wins over a contradicting X-RateLimit-Limit header", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "free", quota: { used: 50, limit: 50 } }, 100));
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.match(err.message, /free tier: 50\/day/);
-  });
-
-  test("new server: unknown access_tier falls back to the header rule", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "gold", quota: { used: 20, limit: 20 } }, 20));
-    const err = await runAndCatch({ apiKey: "k1" });
-    assert.match(err.message, /this API key was served as anonymous/);
-  });
-
-  test("new server: degraded free request (meta.downgraded) → degrade copy with the server's waitlist link", async () => {
+  test("degraded free request (meta.downgraded) → degrade copy with the server's waitlist link", async () => {
     const waitlist = "https://podlens.net/dashboard?source=quota_exhausted#waitlist";
     mockResponse(
-      newServer429(
+      quota429(
         {
-          tier: "anonymous",
           access_tier: "anonymous",
           quota: { used: 20, limit: 20 },
           downgraded: { from: "free", reason: "free_pool_exhausted", waitlist },
         },
-        20,
       ),
     );
     const err = await runAndCatch({ apiKey: "k1" });
@@ -360,16 +302,14 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.doesNotMatch(err.message, /sign in|served as anonymous|invite/i);
   });
 
-  test("new server: new-account probation (reason new_account) → 48-hour copy, not pool-exhaustion copy", async () => {
+  test("new-account probation (reason new_account) → 48-hour copy, not pool-exhaustion copy", async () => {
     mockResponse(
-      newServer429(
+      quota429(
         {
-          tier: "anonymous",
           access_tier: "anonymous",
           quota: { used: 20, limit: 20 },
           downgraded: { from: "free", reason: "new_account", waitlist: "https://podlens.net/dashboard#waitlist" },
         },
-        20,
       ),
     );
     const err = await runAndCatch({ apiKey: "k1" });
@@ -380,16 +320,14 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.doesNotMatch(err.message, /capacity|waitlist|sign in|served as anonymous/i);
   });
 
-  test("new server: unknown downgrade reason → neutral anonymous-level copy", async () => {
+  test("unknown downgrade reason → neutral anonymous-level copy", async () => {
     mockResponse(
-      newServer429(
+      quota429(
         {
-          tier: "anonymous",
           access_tier: "anonymous",
           quota: { used: 20, limit: 20 },
           downgraded: { from: "free", reason: "maintenance", waitlist: "https://podlens.net/dashboard#waitlist" },
         },
-        20,
       ),
     );
     const err = await runAndCatch({ apiKey: "k1" });
@@ -399,10 +337,10 @@ describe("search — 429 tier-aware quota messaging", () => {
   });
 
   test("anonymous 429 qualifies the 50/day upsell with the 48-hour probation", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 20, limit: 20 } }));
     const err = await runAndCatch();
     assert.match(err.message, /new accounts search at the anonymous level for their first 48 hours/);
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 20));
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 20, limit: 20 } }));
     const keyed = await runAndCatch({ apiKey: "k1" });
     assert.match(keyed.message, /50 searches\/day once the account is 48 hours old/);
   });
@@ -414,7 +352,7 @@ describe("search — 429 tier-aware quota messaging", () => {
   const PER_IP_ONLY = /20\/day per IP\)|20\/day per IP —|that quota is used/;
 
   test("/48 allowance, no key → network copy with the free sign-in path, no per-IP claim", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 200));
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 200, limit: 200 } }));
     const err = await runAndCatch();
     assert.equal(err.exitCode, 2);
     assert.match(err.message, /anonymous tier: 20\/day per IP, 200\/day per IPv6 \/48 network; the network's shared 200\/day is used up\)/);
@@ -423,7 +361,7 @@ describe("search — 429 tier-aware quota messaging", () => {
   });
 
   test("/48 allowance, key served as anonymous → network copy naming the key", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 200));
+    mockResponse(quota429({ access_tier: "anonymous", quota: { used: 200, limit: 200 } }));
     const err = await runAndCatch({ apiKey: "k1" });
     assert.equal(err.exitCode, 2);
     assert.match(err.message, NETWORK_COPY);
@@ -439,14 +377,12 @@ describe("search — 429 tier-aware quota messaging", () => {
   ]) {
     test(`/48 allowance, downgraded (${reason}) → network copy in the downgrade branch`, async () => {
       mockResponse(
-        newServer429(
+        quota429(
           {
-            tier: "anonymous",
             access_tier: "anonymous",
             quota: { used: 200, limit: 200 },
             downgraded: { from: "free", reason, waitlist: "https://podlens.net/dashboard#waitlist" },
           },
-          200,
         ),
       );
       const err = await runAndCatch({ apiKey: "k1" });
@@ -456,29 +392,6 @@ describe("search — 429 tier-aware quota messaging", () => {
       assert.doesNotMatch(err.message, PER_IP_ONLY);
     });
   }
-
-  test("meta.quota.limit decides the layer over a contradicting X-RateLimit-Limit header", async () => {
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 20, limit: 20 } }, 200));
-    const perIp = await runAndCatch();
-    assert.match(perIp.message, /anonymous tier: 20\/day per IP\)/);
-    assert.doesNotMatch(perIp.message, /\/48/);
-    mockResponse(newServer429({ tier: "anonymous", access_tier: "anonymous", quota: { used: 200, limit: 200 } }, 20));
-    const network = await runAndCatch();
-    assert.match(network.message, NETWORK_USED);
-  });
-
-  test("no meta: X-RateLimit-Limit 200 infers the anonymous tier (not member/free) and the network copy", async () => {
-    mockResponse({ status: 429, body: { error: "Daily search quota exhausted" }, headers: { "x-ratelimit-limit": "200" } });
-    const keyed = await runAndCatch({ apiKey: "k1" });
-    assert.equal(keyed.exitCode, 2);
-    assert.match(keyed.message, /this API key was served as anonymous/);
-    assert.match(keyed.message, NETWORK_USED);
-    assert.doesNotMatch(keyed.message, /member tier|free tier/);
-    mockResponse({ status: 429, body: { error: "Daily search quota exhausted" }, headers: { "x-ratelimit-limit": "200" } });
-    const anon = await runAndCatch();
-    assert.match(anon.message, NETWORK_COPY);
-    assert.match(anon.message, /sign in free/);
-  });
 
   test("429 without 'quota' in message → exit 3 rate-limit (not daily quota)", async () => {
     mockResponse({
@@ -500,7 +413,59 @@ describe("search — 429 tier-aware quota messaging", () => {
   });
 });
 
-describe("search — network / timeout classes (R7-02, R8-01)", () => {
+describe("search — server text in error messages is terminal-safe", () => {
+  afterEach(restoreFetch);
+
+  // An OSC-8 hyperlink opener, a line break that would start a new stderr
+  // line, and a bidi override.
+  const HOSTILE = "bad\u001b]8;;https://evil.example\u0007 thing\n# heading\u202E";
+  const UNSAFE = /[\u0000-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/;
+
+  for (const [status, exitCode] of [[400, 1], [401, 1], [403, 1], [503, 3], [500, 3]]) {
+    test(`HTTP ${status}: the server's error text is folded to one clean line`, async () => {
+      mockResponse({ status, body: { error: HOSTILE } });
+      const err = await runAndCatch({ apiKey: "k1" });
+      assert.equal(err.exitCode, exitCode);
+      assert.doesNotMatch(err.message, UNSAFE);
+      assert.match(err.message, /bad \]8;;https:\/\/evil\.example thing # heading$/);
+    });
+  }
+
+  test("a non-string error falls back instead of printing [object Object]", async () => {
+    mockResponse({ status: 400, body: { error: { nested: true } } });
+    assert.equal((await runAndCatch()).message, "invalid request: bad request");
+    mockResponse({ status: 503, body: { error: 42 } });
+    assert.equal((await runAndCatch()).message, "podlens.net temporarily unavailable: service unavailable");
+    mockResponse({ status: 500, body: { error: ["x"] }, statusText: "Server\u001b Error" });
+    assert.equal((await runAndCatch()).message, "podlens.net error (HTTP 500): Server Error");
+    mockResponse({ status: 500, body: {}, statusText: "" });
+    assert.equal((await runAndCatch()).message, "podlens.net error (HTTP 500): no detail given");
+  });
+
+  test("429 degrade copy cleans the server's waitlist link, and falls back when it is unusable", async () => {
+    const degraded = (waitlist) => ({
+      status: 429,
+      body: {
+        error: "Daily search quota exhausted",
+        meta: {
+          access_tier: "anonymous",
+          quota: { used: 20, limit: 20 },
+          downgraded: { from: "free", reason: "free_pool_exhausted", waitlist },
+        },
+      },
+    });
+    mockResponse(degraded("https://podlens.net/w\u001b[31m\n# x"));
+    const dirty = await runAndCatch({ apiKey: "k1" });
+    assert.equal(dirty.exitCode, 2);
+    assert.doesNotMatch(dirty.message, UNSAFE);
+    assert.match(dirty.message, /Paid-membership waitlist: https:\/\/podlens\.net\/w \[31m # x \(joining/);
+    mockResponse(degraded("\u001b"));
+    const empty = await runAndCatch({ apiKey: "k1" });
+    assert.match(empty.message, /Paid-membership waitlist: https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/);
+  });
+});
+
+describe("search — network / timeout classes", () => {
   afterEach(restoreFetch);
 
   test("fetch-phase TimeoutError → exit 3 with 30s budget message", async () => {
@@ -519,11 +484,11 @@ describe("search — network / timeout classes (R7-02, R8-01)", () => {
     assert.match(err.message, /timed out after 30s/i);
   });
 
-  test("body-read TimeoutError → exit 3 with body-read message (R8-01)", async () => {
+  test("body-read TimeoutError → exit 3 with body-read message", async () => {
     mockBodyReadTimeoutFetch("TimeoutError");
     const err = await runAndCatch();
     assert.equal(err.exitCode, 3);
-    // R8-01: body-read timeout distinguished from parse failure.
+    // Body-read timeout distinguished from parse failure.
     assert.match(err.message, /while reading response body/i);
     assert.match(err.message, /timed out after 30s/i);
   });
@@ -535,13 +500,13 @@ describe("search — network / timeout classes (R7-02, R8-01)", () => {
     assert.match(err.message, /while reading response body/i);
   });
 
-  test("non-JSON body (proxy HTML) → exit 3 upstream proxy message, NOT timeout message (R8-01)", async () => {
+  test("non-JSON body (proxy HTML) → exit 3 upstream proxy message, NOT timeout message", async () => {
     mockNonJsonFetch(502);
     const err = await runAndCatch();
     assert.equal(err.exitCode, 3);
     assert.match(err.message, /upstream proxy/i);
     assert.match(err.message, /HTTP 502/);
-    // R8-01: real parse failure must NOT be labeled as a timeout.
+    // A real parse failure must NOT be labeled as a timeout.
     assert.doesNotMatch(err.message, /timed out/i);
   });
 
@@ -588,6 +553,24 @@ describe("search — network / timeout classes (R7-02, R8-01)", () => {
     } finally {
       if (saved.p === undefined) delete process.env.HTTPS_PROXY; else process.env.HTTPS_PROXY = saved.p;
       if (saved.u !== undefined) process.env.NODE_USE_ENV_PROXY = saved.u;
+    }
+  });
+
+  test("blocked code with only HTTP_PROXY set → the hint names HTTP_PROXY, not HTTPS_PROXY", async () => {
+    const keys = [...PROXY_VARS, "NODE_USE_ENV_PROXY"];
+    const saved = Object.fromEntries(keys.map((k) => [k, process.env[k]]));
+    for (const k of keys) delete process.env[k];
+    process.env.HTTP_PROXY = "http://localhost:8080";
+    try {
+      mockNetworkErrorFetch("fetch failed", { code: "ECONNREFUSED" });
+      const err = await runAndCatch();
+      assert.equal(err.exitCode, 3);
+      assert.match(err.message, / — HTTP_PROXY is set but Node's fetch ignores it unless NODE_USE_ENV_PROXY=1/);
+    } finally {
+      for (const k of keys) {
+        if (saved[k] === undefined) delete process.env[k];
+        else process.env[k] = saved[k];
+      }
     }
   });
 

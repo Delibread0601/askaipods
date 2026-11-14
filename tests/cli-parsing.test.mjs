@@ -1,10 +1,10 @@
 // Tests for skill/askaipods/scripts/cli.mjs argument parsing:
-//   R6-02 — `search` subcommand only stripped when followed by another positional
-//   R7-01 — argv-safety: injection-shaped queries pass through as literal args
+//   `search` subcommand only stripped when followed by another positional
+//   argv-safety: injection-shaped queries pass through as literal args
 //   --days positive-integer validation
 //   --api-key trim + whitespace + ByteString validation
 //   --format validation
-//   --sort validation (0.3.0)
+//   --sort validation
 //   ASKAIPODS_API_KEY env var fallback
 
 import { test, describe, afterEach, beforeEach } from "node:test";
@@ -51,7 +51,7 @@ async function runAndCatch(argv) {
 describe("run — usage / version / help", () => {
   afterEach(restoreFetch);
 
-  test("--help prints usage banner with the EXACT package.json version (R13-03 parity)", async () => {
+  test("--help prints usage banner with the EXACT package.json version", async () => {
     const stdout = muteStdout();
     try {
       await run(["--help"]);
@@ -63,7 +63,7 @@ describe("run — usage / version / help", () => {
     }
   });
 
-  test("--version prints the EXACT package.json version (R13-03 parity)", async () => {
+  test("--version prints the EXACT package.json version", async () => {
     const stdout = muteStdout();
     try {
       await run(["--version"]);
@@ -87,7 +87,7 @@ describe("run — usage / version / help", () => {
   });
 });
 
-describe("run — search subcommand edge cases (R6-02)", () => {
+describe("run — search subcommand edge cases", () => {
   afterEach(restoreFetch);
 
   test("single positional 'search' is treated as LITERAL query 'search', not a subcommand with missing arg", async () => {
@@ -429,7 +429,7 @@ describe("run — --api-key validation", () => {
   });
 });
 
-describe("run — argv safety (R7-01)", () => {
+describe("run — argv safety", () => {
   afterEach(restoreFetch);
 
   // The contract promise in SKILL.md §Argv-safety rule is that a query
@@ -483,7 +483,7 @@ describe("bin/askaipods.js subprocess — exit code contract", () => {
   // errors with the right exit code. In-process tests verify AskaipodsError
   // shape; this verifies the process boundary maps it to process.exit().
 
-  test("--version exits 0 and emits exact package.json version (R13-03 parity)", () => {
+  test("--version exits 0 and emits exact package.json version", () => {
     const res = spawnSync(process.execPath, [BIN, "--version"], { encoding: "utf8" });
     assert.equal(res.status, 0);
     assert.equal(res.stdout, `askaipods ${PKG_VERSION}\n`);
@@ -553,11 +553,4 @@ describe("SKILL.md single-quote recipe survives a real POSIX shell", () => {
       assert.equal(res.stdout, q);
     });
   }
-});
-
-describe("version strings stay in sync", () => {
-  test("client User-Agent carries the package.json version", () => {
-    const client = readFileSync(join(ROOT, "skill", "askaipods", "scripts", "client.mjs"), "utf8");
-    assert.match(client, new RegExp(`"User-Agent": "askaipods/${PKG_VERSION.replace(/\./g, "\\.")} `));
-  });
 });

@@ -40,6 +40,8 @@ Codex should detect the trigger, run the bundled `node <skill-dir>/scripts/askai
 - **Skill not detected**: Restart Codex (per the official docs, "If an update doesn't appear, restart Codex").
 - **Multiple skills with the same name across scopes**: Codex shows both in the selector — pick the intended copy, or remove the duplicate.
 - **The search command fails**: Check Node.js 18.3.0+: `node --version`.
+- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then add `export ASKAIPODS_API_KEY=<the account's API key>` to your shell profile and start a new Codex session from that shell, for 50/day (a new account searches at the anonymous level for its first 48 hours).
+- **Free quota exhausted (50/day)**: member access (100/day) is not open for sign-up; the paid-membership waitlist is at https://podlens.net/dashboard?source=askaipods#waitlist — joining records interest and does not grant membership.
 - **Network blocked by the sandbox**: Codex's default `workspace-write` sandbox has network access off, so the search fails with `fetch failed (ENOTFOUND)` or similar. Approve the command when Codex asks for network access, or enable network access in your Codex sandbox settings (see the [Codex sandbox documentation](https://learn.chatgpt.com/docs/agent-approvals-security)); a search only needs `podlens.net`.
 
 ## Reference

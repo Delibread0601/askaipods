@@ -1,11 +1,8 @@
 // Tests for format.mjs renderMarkdown:
-//   R2-01 — empty-result 6-step priority ladder
-//   R2-03 — non-empty freshness banner
-//   R3-02 — expanded-empty branch appends "(corpus indexed through X)"
-//   R5-01 — corpus_freshness missing newest_date rejected at envelope level
-//           (validator test; here we check the downstream render only
-//           receives validated shapes)
-//   R6-01 — unknown warning code falls back with forward-compat copy
+//   empty-result 6-step priority ladder
+//   non-empty freshness banner
+//   expanded-empty branch appends "(corpus indexed through X)"
+//   unknown warning code falls back with forward-compat copy
 //   Plus: refunded tag, per-tier closing note, header (tier / sort /
 //   results / quota), degrade notice.
 
@@ -18,7 +15,6 @@ import { validEnvelope, validResult } from "./helpers.mjs";
 function empty(metaOverrides = {}) {
   return validEnvelope({
     meta: {
-      tier: "anonymous",
       quota: { used: 1, limit: 20 },
       ...metaOverrides,
     },
@@ -36,7 +32,6 @@ function nonEmpty(metaOverrides = {}) {
       }),
     ],
     meta: {
-      tier: "anonymous",
       quota: { used: 1, limit: 20 },
       ...metaOverrides,
     },
@@ -44,17 +39,15 @@ function nonEmpty(metaOverrides = {}) {
 }
 
 describe("renderMarkdown — header", () => {
-  test("header line includes tier, result count, and quota", () => {
+  test("header line includes tier, served ordering, result count, and quota", () => {
     const out = renderMarkdown("test q", validEnvelope());
     assert.match(out, /# askaipods · "test q"/);
-    assert.match(out, /Tier: anonymous/);
-    assert.match(out, /Results: 0/);
-    assert.match(out, /Quota: 1\/20 daily/);
+    assert.match(out, /\*Tier: anonymous · Sort: recency · Results: 0 · Quota: 1\/20 daily\*/);
   });
 
   test("quota.period passthrough (non-'daily' label)", () => {
     const env = validEnvelope({
-      meta: { tier: "member", quota: { used: 3, limit: 100, period: "per-day" } },
+      meta: { access_tier: "member", quota: { used: 3, limit: 100, period: "per-day" } },
     });
     const out = renderMarkdown("q", env);
     assert.match(out, /Quota: 3\/100 per-day/);
@@ -78,7 +71,7 @@ describe("renderMarkdown — header", () => {
   });
 });
 
-describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
+describe("renderMarkdown — empty result ladder priority", () => {
   test("step 1: warning 'corpus_stale_for_requested_window' — message + newest_date suffix", () => {
     const env = empty({
       warning: { code: "corpus_stale_for_requested_window" },
@@ -111,7 +104,7 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.match(out, /retry in a few minutes/i);
   });
 
-  test("step 3: unknown warning code (forward-compat, R6-01)", () => {
+  test("step 3: unknown warning code (forward-compat)", () => {
     // Novel code the client has never seen — validator stays open-enum,
     // renderer surfaces the raw code instead of falling through to generic copy.
     const env = empty({ warning: { code: "novel_future_warning_v9" } });
@@ -130,7 +123,7 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.match(out, /Try again in a moment/i);
   });
 
-  test("R2-01: truncated MUST be checked before expanded (both true → truncated wins)", () => {
+  test("truncated MUST be checked before expanded (both true → truncated wins)", () => {
     // When a fallback Vectorize query errors mid-expansion, both flags are
     // true. Truncated copy ("retry") is strictly more actionable than
     // expanded copy ("rephrase").
@@ -142,7 +135,7 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.doesNotMatch(out, /The API expanded the search window/);
   });
 
-  test("step 5: window.expanded + newest_date → 'corpus indexed through' suffix (R3-02)", () => {
+  test("step 5: window.expanded + newest_date → 'corpus indexed through' suffix", () => {
     const env = empty({
       window: { requested_days: 30, served_days: 180, expanded: true },
       corpus_freshness: { newest_date: "2026-04-05" },
@@ -187,14 +180,14 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
     assert.doesNotMatch(out, /all-time/);
   });
 
-  test("anonymous note follows the server's restrictions.max_days (old server: 90)", () => {
+  test("anonymous note follows the server's restrictions.max_days (here 90)", () => {
     const out = renderMarkdown("q", empty({ restrictions: { max_results: 20, max_days: 90 } }));
     assert.match(out, /--days capped at 90 \(omitted = 90\)/);
   });
 
   test("member empty result appends no tier note", () => {
     const env = validEnvelope({
-      meta: { tier: "member", quota: { used: 5, limit: 100 } },
+      meta: { access_tier: "member", quota: { used: 5, limit: 100 } },
     });
     const out = renderMarkdown("q", env);
     assert.doesNotMatch(out, /Anonymous tier|Free tier|waitlist/);
@@ -210,9 +203,8 @@ describe("renderMarkdown — empty result ladder priority (R2-01)", () => {
   });
 });
 
-describe("renderMarkdown — three-tier server (0.3.0)", () => {
+describe("renderMarkdown — tier, ordering and degrade notices", () => {
   const meta3 = (extra) => ({
-    tier: "anonymous",
     quota: { used: 1, limit: 20 },
     sort: { requested: "recency", served: "recency" },
     ...extra,
@@ -234,15 +226,10 @@ describe("renderMarkdown — three-tier server (0.3.0)", () => {
   test("member served relevance: header says relevance, no tier note", () => {
     const out = renderMarkdown(
       "q",
-      nonEmpty(meta3({ tier: "member", access_tier: "member", quota: { used: 3, limit: 100 }, sort: { requested: "relevance", served: "relevance" } })),
+      nonEmpty(meta3({ access_tier: "member", quota: { used: 3, limit: 100 }, sort: { requested: "relevance", served: "relevance" } })),
     );
     assert.match(out, /Tier: member · Sort: relevance ·/);
     assert.doesNotMatch(out, /Anonymous tier|Free tier/);
-  });
-
-  test("old server (no sort) → header has no Sort label", () => {
-    const out = renderMarkdown("q", nonEmpty());
-    assert.doesNotMatch(out, /Sort:/);
   });
 
   test("free tier note: cap 90 + paid-membership waitlist from meta.cta.waitlist, no approval promise", () => {
@@ -316,7 +303,7 @@ describe("renderMarkdown — three-tier server (0.3.0)", () => {
   });
 });
 
-describe("renderMarkdown — non-empty freshness banner (R2-03, R6-01)", () => {
+describe("renderMarkdown — non-empty freshness banner", () => {
   test("corpus_stale_for_requested_window banner + newest_date suffix", () => {
     const env = nonEmpty({
       warning: { code: "corpus_stale_for_requested_window" },
@@ -338,11 +325,11 @@ describe("renderMarkdown — non-empty freshness banner (R2-03, R6-01)", () => {
     assert.match(out, /\*Note: Recently indexed episodes are still propagating/);
   });
 
-  test("unknown warning code in non-empty render shows forward-compat banner (R6-01)", () => {
+  test("unknown warning code in non-empty render shows forward-compat banner", () => {
     const env = nonEmpty({ warning: { code: "some_new_code_xyz" } });
     const out = renderMarkdown("q", env);
     assert.match(out, /code: some_new_code_xyz/);
-    // Banner is non-empty (R2-03; the freshness banner in references/notices.md)
+    // Banner is non-empty (the freshness banner in references/notices.md)
     assert.match(out, /\*Note:/);
   });
 
@@ -488,7 +475,7 @@ describe("renderMarkdown — server strings cannot inject terminal or markdown s
   });
 
   test("quota.period (passthrough, unvalidated) cannot inject into the header", () => {
-    const env = validEnvelope({ meta: { tier: "anonymous", quota: { used: 1, limit: 20, period: "daily\u001b]8;;x\u0007\n# y" } } });
+    const env = validEnvelope({ meta: { quota: { used: 1, limit: 20, period: "daily\u001b]8;;x\u0007\n# y" } } });
     const out = renderMarkdown("q", env);
     assert.doesNotMatch(out, /\u001b|\u0007/);
     assert.doesNotMatch(out, /^# y/m);
@@ -499,7 +486,6 @@ describe("renderMarkdown — server strings cannot inject terminal or markdown s
       total: 1,
       results: [validResult()],
       meta: {
-        tier: "anonymous",
         quota: { used: 1, limit: 20 },
         downgraded: { from: "free", reason: "odd\n# x\u001b", waitlist: "https://podlens.net/w" },
         warning: { code: "new_code\n## y" },

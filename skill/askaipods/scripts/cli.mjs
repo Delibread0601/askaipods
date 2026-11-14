@@ -48,8 +48,8 @@ EXIT CODES:
   0  success
   1  usage error / invalid arguments / API key rejected
   2  daily quota exhausted, or podlens.net's daily anonymous-level capacity
-     reached — do not retry at the same tier before 00:00 UTC (tier-aware
-     message on stderr)
+     reached — do not retry at the same tier before 00:00 UTC (stderr names
+     the reset time and, when known, the limit that was hit)
   3  transient or unexpected failure — network / rate-limit burst / transient 503 /
      protocol error / internal exception (stderr has the actionable detail)
 
@@ -103,8 +103,8 @@ export async function run(argv) {
   // muscle memory.
   //
   // "search" is stripped as a subcommand only when another positional
-  // follows it (audit R6-02). A lone `askaipods search` runs the literal
-  // one-word query "search" instead of failing with "missing query".
+  // follows it. A lone `askaipods search` runs the literal one-word
+  // query "search" instead of failing with "missing query".
   // The cost of the rule: an unquoted multi-word query that begins with
   // the word "search" loses that word (`askaipods search engines and AI`
   // searches "engines and AI"), so such a query must be quoted:

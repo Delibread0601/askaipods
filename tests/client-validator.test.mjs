@@ -38,22 +38,22 @@ describe("isValidSuccessEnvelope — minimal valid shapes", () => {
   test("accepts the minimal anonymous envelope", async () => {
     const data = await callSearch(validEnvelope());
     assert.equal(data.total, 0);
-    assert.equal(data.meta.tier, "anonymous");
+    assert.equal(data.meta.access_tier, "anonymous");
   });
 
   test("accepts envelope with populated results", async () => {
     const env = validEnvelope({
       total: 2,
-      results: [validResult(), validResult({ published_at: "2025-09" })],
+      results: [validResult(), validResult({ published_at: "2025-09-01" })],
     });
     const data = await callSearch(env);
     assert.equal(data.results.length, 2);
   });
 
   test("accepts member tier", async () => {
-    const env = validEnvelope({ meta: { tier: "member", quota: { used: 5, limit: 100 } } });
+    const env = validEnvelope({ meta: { access_tier: "member", quota: { used: 5, limit: 100 } } });
     const data = await callSearch(env);
-    assert.equal(data.meta.tier, "member");
+    assert.equal(data.meta.access_tier, "member");
   });
 });
 
@@ -85,6 +85,19 @@ describe("isValidSuccessEnvelope — envelope-level shape checks", () => {
   test("rejects non-array results", async () => {
     await expectEnvelopeRejected(validEnvelope({ results: {} }));
   });
+
+  // validEnvelope() always supplies a base meta, so these bodies are
+  // written out by hand.
+  for (const [meta, description] of [
+    [undefined, "absent"],
+    [null, "null"],
+    [[], "array"],
+    ["n/a", "string"],
+  ]) {
+    test(`rejects meta: ${description}`, async () => {
+      await expectEnvelopeRejected({ total: 0, results: [], meta });
+    });
+  }
 });
 
 describe("isValidSuccessEnvelope — result-row shape checks", () => {
@@ -224,12 +237,11 @@ describe("isValidSuccessEnvelope — results[].anchor_s / anchor_url (0.2.9)", (
   });
 });
 
-describe("isValidSuccessEnvelope — published_at calendar validation (R3-01)", () => {
+describe("isValidSuccessEnvelope — published_at calendar validation", () => {
   afterEach(restoreFetch);
 
   const cases = [
     ["2025-10-15", true, "YYYY-MM-DD"],
-    ["2025-10", true, "YYYY-MM (anonymous tier)"],
     ["2025-10-15T12:00:00Z", true, "Z offset"],
     ["2025-10-15T12:00:00+14:00", true, "max +14 offset"],
     ["2025-10-15T12:00:00.123Z", true, "fractional seconds"],
@@ -247,7 +259,8 @@ describe("isValidSuccessEnvelope — published_at calendar validation (R3-01)", 
     ["2025-10-15T12:60:00Z", false, "minute 60"],
     ["2025-10-15T12:00:00+15:00", false, "offset >+14"],
     ["1969-12-31", false, "pre-1970 bound"],
-    ["2025", false, "YYYY alone (regex requires ≥YYYY-MM)"],
+    ["2025", false, "YYYY alone"],
+    ["2025-10", false, "month-only (a full date is required)"],
   ];
 
   for (const [input, valid, description] of cases) {
@@ -275,46 +288,40 @@ describe("isValidSuccessEnvelope — published_at calendar validation (R3-01)", 
   });
 });
 
-describe("isValidSuccessEnvelope — meta.tier / meta.quota (R2-02)", () => {
+describe("isValidSuccessEnvelope — meta.quota", () => {
   afterEach(restoreFetch);
-
-  test("rejects unknown tier value (closed enum)", async () => {
-    await expectEnvelopeRejected(
-      validEnvelope({ meta: { tier: "premium", quota: { used: 0, limit: 10 } } }),
-    );
-  });
 
   test("rejects non-object quota", async () => {
     await expectEnvelopeRejected(
-      validEnvelope({ meta: { tier: "anonymous", quota: "n/a" } }),
+      validEnvelope({ meta: { quota: "n/a" } }),
     );
   });
 
   test("rejects non-number quota.used", async () => {
     await expectEnvelopeRejected(
-      validEnvelope({ meta: { tier: "anonymous", quota: { used: "1", limit: 20 } } }),
+      validEnvelope({ meta: { quota: { used: "1", limit: 20 } } }),
     );
   });
 
   test("rejects non-number quota.limit", async () => {
     await expectEnvelopeRejected(
-      validEnvelope({ meta: { tier: "anonymous", quota: { used: 1, limit: null } } }),
+      validEnvelope({ meta: { quota: { used: 1, limit: null } } }),
     );
   });
 
   test("accepts quota.refunded true (boolean)", async () => {
     const data = await callSearch(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 0, limit: 20, refunded: true } },
+        meta: { quota: { used: 0, limit: 20, refunded: true } },
       }),
     );
     assert.equal(data.meta.quota.refunded, true);
   });
 
-  test("rejects quota.refunded as string (R2-02)", async () => {
+  test("rejects quota.refunded as string", async () => {
     await expectEnvelopeRejected(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 0, limit: 20, refunded: "yes" } },
+        meta: { quota: { used: 0, limit: 20, refunded: "yes" } },
       }),
     );
   });
@@ -323,7 +330,6 @@ describe("isValidSuccessEnvelope — meta.tier / meta.quota (R2-02)", () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
           quota: { used: 1, limit: 20, period: "daily", next_reset: "2026-04-21T00:00:00Z" },
         },
       }),
@@ -332,15 +338,13 @@ describe("isValidSuccessEnvelope — meta.tier / meta.quota (R2-02)", () => {
   });
 });
 
-describe("isValidSuccessEnvelope — meta.warning (R2-02, R6-01)", () => {
+describe("isValidSuccessEnvelope — meta.warning", () => {
   afterEach(restoreFetch);
 
   test("accepts warning with string code", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           warning: { code: "corpus_stale_for_requested_window" },
         },
       }),
@@ -348,12 +352,10 @@ describe("isValidSuccessEnvelope — meta.warning (R2-02, R6-01)", () => {
     assert.equal(data.meta.warning.code, "corpus_stale_for_requested_window");
   });
 
-  test("accepts unknown warning code (validator stays open-enum, R6-01)", async () => {
+  test("accepts unknown warning code (validator stays open-enum)", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           warning: { code: "a_new_future_warning" },
         },
       }),
@@ -365,8 +367,6 @@ describe("isValidSuccessEnvelope — meta.warning (R2-02, R6-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           warning: { code: 42 },
         },
       }),
@@ -377,8 +377,6 @@ describe("isValidSuccessEnvelope — meta.warning (R2-02, R6-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           warning: "stale",
         },
       }),
@@ -388,22 +386,20 @@ describe("isValidSuccessEnvelope — meta.warning (R2-02, R6-01)", () => {
   test("accepts warning null / absent", async () => {
     const data = await callSearch(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, warning: null },
+        meta: { warning: null },
       }),
     );
     assert.equal(data.meta.warning, null);
   });
 });
 
-describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () => {
+describe("isValidSuccessEnvelope — meta.corpus_freshness", () => {
   afterEach(restoreFetch);
 
-  test("rejects corpus_freshness missing newest_date property (R5-01)", async () => {
+  test("rejects corpus_freshness missing newest_date property", async () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: {},
         },
       }),
@@ -414,8 +410,6 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: "2025-10-15",
         },
       }),
@@ -427,8 +421,6 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: 42 },
         },
       }),
@@ -439,8 +431,6 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: "2026-04-15" },
         },
       }),
@@ -452,8 +442,6 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: null },
         },
       }),
@@ -461,12 +449,10 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     assert.equal(data.meta.corpus_freshness.newest_date, null);
   });
 
-  test("R4-01: invalid-calendar newest_date (Feb 30) coerces to null without failing envelope", async () => {
+  test("invalid-calendar newest_date (Feb 30) coerces to null without failing envelope", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: "2026-02-30" },
         },
       }),
@@ -478,12 +464,10 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     );
   });
 
-  test("R4-01: non-ISO newest_date (e.g. 'yesterday') coerces to null", async () => {
+  test("non-ISO newest_date (e.g. 'yesterday') coerces to null", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: "yesterday" },
         },
       }),
@@ -491,12 +475,10 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
     assert.equal(data.meta.corpus_freshness.newest_date, null);
   });
 
-  test("R4-01: month-only newest_date coerces to null (YYYY-MM rejected, full date required)", async () => {
+  test("month-only newest_date coerces to null (YYYY-MM rejected, full date required)", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           corpus_freshness: { newest_date: "2026-04" },
         },
       }),
@@ -505,15 +487,13 @@ describe("isValidSuccessEnvelope — meta.corpus_freshness (R4-01, R5-01)", () =
   });
 });
 
-describe("isValidSuccessEnvelope — meta.cta (R2-02)", () => {
+describe("isValidSuccessEnvelope — meta.cta", () => {
   afterEach(restoreFetch);
 
   test("accepts cta as object", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           cta: { label: "Sign up", url: "https://podlens.net" },
         },
       }),
@@ -524,7 +504,7 @@ describe("isValidSuccessEnvelope — meta.cta (R2-02)", () => {
   test("rejects cta as non-object primitive", async () => {
     await expectEnvelopeRejected(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, cta: "upgrade" },
+        meta: { cta: "upgrade" },
       }),
     );
   });
@@ -532,22 +512,20 @@ describe("isValidSuccessEnvelope — meta.cta (R2-02)", () => {
   test("accepts cta null", async () => {
     const data = await callSearch(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, cta: null },
+        meta: { cta: null },
       }),
     );
     assert.equal(data.meta.cta, null);
   });
 });
 
-describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
+describe("isValidSuccessEnvelope — meta.window", () => {
   afterEach(restoreFetch);
 
   test("accepts minimal valid window", async () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: { requested_days: 30, served_days: 90, expanded: true },
         },
       }),
@@ -559,8 +537,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     const data = await callSearch(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: {
             requested_days: 30,
             served_days: 180,
@@ -578,7 +554,7 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
   test("rejects non-object window", async () => {
     await expectEnvelopeRejected(
       validEnvelope({
-        meta: { tier: "anonymous", quota: { used: 1, limit: 20 }, window: "30d" },
+        meta: { window: "30d" },
       }),
     );
   });
@@ -587,8 +563,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: { requested_days: "30", served_days: 30, expanded: false },
         },
       }),
@@ -599,8 +573,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: { requested_days: 30, expanded: false },
         },
       }),
@@ -611,8 +583,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: { requested_days: 30, served_days: 30, expanded: "false" },
         },
       }),
@@ -623,8 +593,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: {
             requested_days: 30,
             served_days: 30,
@@ -640,8 +608,6 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
     await expectEnvelopeRejected(
       validEnvelope({
         meta: {
-          tier: "anonymous",
-          quota: { used: 1, limit: 20 },
           window: {
             requested_days: 30,
             served_days: 30,
@@ -654,42 +620,34 @@ describe("isValidSuccessEnvelope — meta.window (R3-01)", () => {
   });
 });
 
-describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sort / downgraded)", () => {
+describe("isValidSuccessEnvelope — tier fields (access_tier / sort / downgraded)", () => {
   afterEach(restoreFetch);
-
-  const meta = (extra) => ({ tier: "anonymous", quota: { used: 1, limit: 20 }, ...extra });
-
-  test("old server shape (no access_tier / sort / downgraded) still accepted", async () => {
-    const data = await callSearch(validEnvelope());
-    assert.equal(data.meta.access_tier, undefined);
-    assert.equal(data.meta.sort, undefined);
-  });
 
   for (const access_tier of ["anonymous", "free", "member"]) {
     test(`accepts access_tier "${access_tier}"`, async () => {
-      const tier = access_tier === "member" ? "member" : "anonymous";
-      const data = await callSearch(validEnvelope({ meta: meta({ tier, access_tier }) }));
+      const data = await callSearch(validEnvelope({ meta: { access_tier } }));
       assert.equal(data.meta.access_tier, access_tier);
     });
   }
-
-  test("accepts null access_tier (treated as absent)", async () => {
-    await callSearch(validEnvelope({ meta: meta({ access_tier: null }) }));
-  });
 
   for (const [bad, description] of [
     ["premium", "unknown string"],
     ["Free", "wrong case"],
     [1, "number"],
     [{}, "object"],
+    [null, "null"],
+    [undefined, "absent"],
   ]) {
     test(`rejects access_tier: ${description}`, async () => {
-      await expectEnvelopeRejected(validEnvelope({ meta: meta({ access_tier: bad }) }));
+      await expectEnvelopeRejected(validEnvelope({ meta: { access_tier: bad } }));
     });
   }
 
-  test("meta.tier stays the closed two-value enum — 'free' there is rejected", async () => {
-    await expectEnvelopeRejected(validEnvelope({ meta: meta({ tier: "free", access_tier: "free" }) }));
+  test("the server's legacy meta.tier is not read: any value, or none, is accepted", async () => {
+    for (const tier of ["anonymous", "member", "free", "a-future-value", undefined]) {
+      const data = await callSearch(validEnvelope({ meta: { tier, access_tier: "free" } }));
+      assert.equal(data.meta.access_tier, "free");
+    }
   });
 
   test("accepts sort with enum values (incl. a relevance→recency downgrade)", async () => {
@@ -698,7 +656,7 @@ describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sor
       { requested: "relevance", served: "relevance" },
       { requested: "relevance", served: "recency" },
     ]) {
-      const data = await callSearch(validEnvelope({ meta: meta({ sort }) }));
+      const data = await callSearch(validEnvelope({ meta: { sort } }));
       assert.deepEqual(data.meta.sort, sort);
     }
   });
@@ -710,9 +668,11 @@ describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sor
     [{ requested: "recency", served: "similarity" }, "unknown served value"],
     [{ requested: "newest", served: "recency" }, "unknown requested value"],
     [[], "array"],
+    [null, "null"],
+    [undefined, "absent"],
   ]) {
     test(`rejects sort: ${description}`, async () => {
-      await expectEnvelopeRejected(validEnvelope({ meta: meta({ sort: bad }) }));
+      await expectEnvelopeRejected(validEnvelope({ meta: { sort: bad } }));
     });
   }
 
@@ -723,7 +683,7 @@ describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sor
         reason,
         waitlist: "https://podlens.net/dashboard?source=quota_exhausted#waitlist",
       };
-      const data = await callSearch(validEnvelope({ meta: meta({ access_tier: "anonymous", downgraded }) }));
+      const data = await callSearch(validEnvelope({ meta: { access_tier: "anonymous", downgraded } }));
       assert.deepEqual(data.meta.downgraded, downgraded);
     });
   }
@@ -735,7 +695,7 @@ describe("isValidSuccessEnvelope — three-tier fields (0.3.0: access_tier / sor
     [{ from: "free", reason: null, waitlist: "https://podlens.net/" }, "null reason"],
   ]) {
     test(`rejects downgraded: ${description}`, async () => {
-      await expectEnvelopeRejected(validEnvelope({ meta: meta({ downgraded: bad }) }));
+      await expectEnvelopeRejected(validEnvelope({ meta: { downgraded: bad } }));
     });
   }
 });

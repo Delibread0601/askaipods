@@ -49,6 +49,8 @@ OpenClaw should recognize the trigger phrase, run the bundled `node <skill-dir>/
 
 - **Skill not detected**: OpenClaw watches skill folders and refreshes when `SKILL.md` changes; if the skill still does not appear, start a new session or restart the OpenClaw Gateway (`openclaw skills update` tracks ClawHub installs only, not this Git/copied install). Check that the directory name `askaipods` matches the `name` field in `SKILL.md`.
 - **The search command fails**: Make sure Node.js 18.3.0+ is on PATH: `node --version`.
+- **Anonymous quota exhausted (20/day)**: sign in free with Google or GitHub at https://podlens.net, then make `ASKAIPODS_API_KEY=<the account's API key>` available in the environment OpenClaw runs commands in (the [OpenClaw skills documentation](https://docs.openclaw.ai/tools/skills) covers per-skill environment settings) and start a new session, for 50/day (a new account searches at the anonymous level for its first 48 hours).
+- **Free quota exhausted (50/day)**: member access (100/day) is not open for sign-up; the paid-membership waitlist is at https://podlens.net/dashboard?source=askaipods#waitlist — joining records interest and does not grant membership.
 - **Conflicting copies across precedence levels**: Only the highest-precedence one wins. If you have askaipods in both `~/.agents/skills/` and `<workspace>/skills/`, the workspace one takes effect.
 
 ## Reference
