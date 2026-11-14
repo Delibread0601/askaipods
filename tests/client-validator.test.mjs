@@ -79,7 +79,9 @@ describe("isValidSuccessEnvelope — envelope-level shape checks", () => {
   });
 
   test("rejects NaN/Infinity total", async () => {
-    await expectEnvelopeRejected(validEnvelope({ total: Number.POSITIVE_INFINITY }));
+    for (const total of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      await expectEnvelopeRejected(validEnvelope({ total }));
+    }
   });
 
   test("rejects non-array results", async () => {
@@ -363,14 +365,10 @@ describe("isValidSuccessEnvelope — meta.warning", () => {
     assert.equal(data.meta.warning.code, "a_new_future_warning");
   });
 
-  test("rejects warning missing code (non-object .code)", async () => {
-    await expectEnvelopeRejected(
-      validEnvelope({
-        meta: {
-          warning: { code: 42 },
-        },
-      }),
-    );
+  test("rejects warning with a missing or non-string code", async () => {
+    for (const warning of [{}, { code: 42 }]) {
+      await expectEnvelopeRejected(validEnvelope({ meta: { warning } }));
+    }
   });
 
   test("rejects warning as non-object", async () => {
@@ -384,12 +382,10 @@ describe("isValidSuccessEnvelope — meta.warning", () => {
   });
 
   test("accepts warning null / absent", async () => {
-    const data = await callSearch(
-      validEnvelope({
-        meta: { warning: null },
-      }),
-    );
-    assert.equal(data.meta.warning, null);
+    const withNull = await callSearch(validEnvelope({ meta: { warning: null } }));
+    assert.equal(withNull.meta.warning, null);
+    const absent = await callSearch(validEnvelope());
+    assert.equal("warning" in absent.meta, false);
   });
 });
 
