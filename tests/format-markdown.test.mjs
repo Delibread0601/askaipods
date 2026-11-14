@@ -342,7 +342,7 @@ describe("renderMarkdown — non-empty freshness banner (R2-03, R6-01)", () => {
     const env = nonEmpty({ warning: { code: "some_new_code_xyz" } });
     const out = renderMarkdown("q", env);
     assert.match(out, /code: some_new_code_xyz/);
-    // Banner is non-empty (R2-03 SKILL.md "Freshness" instruction rendered in all templates)
+    // Banner is non-empty (R2-03; the freshness banner in references/notices.md)
     assert.match(out, /\*Note:/);
   });
 

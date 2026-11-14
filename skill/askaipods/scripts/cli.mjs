@@ -19,7 +19,7 @@ const VERSION = "0.3.5";
 const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
 
 USAGE:
-  askaipods <query>
+  askaipods <query> [options]
   askaipods search <query> [options]
 
 OPTIONS:
@@ -102,18 +102,12 @@ export async function run(argv) {
   // future subcommands (e.g., `askaipods quota`) won't break the v0
   // muscle memory.
   //
-  // Only strip "search" as a subcommand when there are additional
-  // positionals after it (audit R6-02). Treating a lone `search`
-  // positional as a subcommand would produce a misleading "missing
-  // query" error for the plausible case `askaipods search` (user
-  // typed the subcommand name expecting an interactive prompt); and
-  // stripping a leading `search` from a multi-word unquoted query
-  // like `askaipods search engines and AI` would silently drop the
-  // first word without the user noticing. The refined rule: if the
-  // user types exactly one positional equal to "search", treat it as
-  // the literal one-word query "search" rather than a subcommand
-  // with missing argument. For multi-word queries beginning with the
-  // literal word "search", the user should quote:
+  // "search" is stripped as a subcommand only when another positional
+  // follows it (audit R6-02). A lone `askaipods search` runs the literal
+  // one-word query "search" instead of failing with "missing query".
+  // The cost of the rule: an unquoted multi-word query that begins with
+  // the word "search" loses that word (`askaipods search engines and AI`
+  // searches "engines and AI"), so such a query must be quoted:
   // `askaipods "search engines and AI"`.
   let query;
   if (positionals[0] === "search" && positionals.length > 1) {

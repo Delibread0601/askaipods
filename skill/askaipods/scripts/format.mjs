@@ -100,7 +100,7 @@ export function clock(seconds) {
 // newest-first contract for any member-tier response that carries
 // offset timestamps. Numeric UTC compare fixes that.
 //
-// Both tiers now return full dates (YYYY-MM-DD or a full ISO 8601
+// Every tier now returns full dates (YYYY-MM-DD or a full ISO 8601
 // timestamp with offset). Older servers sent month-only YYYY-MM dates
 // for the anonymous tier, and the validator still accepts that shape;
 // Date.parse is inconsistent across engines for it, so normalize to
@@ -137,8 +137,8 @@ export function sortByDateDesc(items) {
 //     always relevance-selected, anonymous ones recency-selected.
 //
 // Preconditions: `response` must be a validated success envelope from
-// `client.search()`. `client.mjs` validates `meta.tier` is a non-empty
-// string and `meta.quota` is an object before returning, so we read
+// `client.search()`. `client.mjs` validates `meta.tier` against its
+// closed enum and `meta.quota` as an object before returning, so we read
 // those fields directly here without a fallback. A programmatic caller
 // that bypasses client.search() and hands toStructured a malformed
 // response will get a TypeError — that's louder than a silent fallback
@@ -146,7 +146,7 @@ export function sortByDateDesc(items) {
 export function toStructured(query, response) {
   // These fields are guaranteed by client.mjs's success-envelope validator:
   //   response.results (array), response.meta (object),
-  //   response.meta.tier (non-empty string), response.meta.quota (object).
+  //   response.meta.tier (closed enum), response.meta.quota (object).
   // Read them directly. The remaining fields below (total,
   // meta.query_hash, meta.restrictions) are optional per the server
   // contract and keep their `?? null` / fallback defenses.
@@ -270,7 +270,8 @@ export function renderMarkdown(query, response) {
     // messaging because they tell the user something stronger — the
     // corpus (not just their query phrasing) is the reason for the
     // empty response.
-    // Priority ladder (must match SKILL.md §Error handling):
+    // Priority ladder (must match references/notices.md §Empty results
+    // — priority ladder):
     //   1. warning.code = corpus_stale_for_requested_window
     //   2. warning.code = index_metadata_stale
     //   3. warning.code = any other value (forward-compat, R6-01)
@@ -305,11 +306,11 @@ export function renderMarkdown(query, response) {
         "No results found (search window expansion was interrupted by a transient error). Try again in a moment.",
       );
     } else if (win && win.expanded) {
-      // SKILL.md §Error handling step 5 mandates appending the
+      // Step 5 of the references/notices.md ladder appends the
       // corpus-indexed-through suffix when newest_date is present —
       // an honest freshness signal distinct from the freshness warning
       // (which would have landed on the warning branches above). Keeps
-      // CLI markdown and SKILL.md's agent render instructions aligned.
+      // CLI markdown and the agent render instructions aligned.
       const indexedThrough = newest ? ` (corpus indexed through ${newest})` : "";
       lines.push(
         `No results found. The API expanded the search window from ${win.requested_days} to ${win.served_days} days but still found no matches${indexedThrough}. Try a different phrasing or broader topic.`,
@@ -325,11 +326,11 @@ export function renderMarkdown(query, response) {
     return lines.join("\n");
   }
 
-  // Freshness warning (partial-results case): SKILL.md's meta.warning
-  // contract covers both empty AND partial responses. When results are
-  // present but the server still flags a freshness issue (e.g.,
-  // index_metadata_stale: fresh episodes exist but some haven't
-  // propagated to Vectorize yet), emit a banner above the results so
+  // Freshness warning (partial-results case): the meta.warning contract
+  // in references/notices.md covers both empty AND partial responses.
+  // When results are present but the server still flags a freshness
+  // issue (e.g., index_metadata_stale: fresh episodes exist but some
+  // haven't propagated to Vectorize yet), emit a banner above the results so
   // the user knows the set is incomplete rather than authoritative.
   // Placed before the expansion note so freshness signals dominate —
   // same priority intent as the empty-branch ladder.

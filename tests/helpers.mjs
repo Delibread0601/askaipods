@@ -2,7 +2,8 @@
 //
 // We stub `globalThis.fetch` per-test instead of reaching for a library.
 // The production code only uses `.ok`, `.status`, `.statusText`, `.json()`
-// from the Response, so a plain object is enough.
+// and (on a 429) `.headers.get()` from the Response, so a plain object is
+// enough.
 
 // Snapshot the real fetch once at module load. Per-test restore then
 // always resets to the native implementation, not to whatever

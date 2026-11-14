@@ -4,8 +4,9 @@
 // or status codes — it gets back either a parsed response object or a
 // thrown error carrying a stable exitCode (1=usage, 2=quota or daily
 // capacity, 3=network / transient).
-// That separation lets the test suite mock the network at this seam
-// instead of patching `fetch` globally.
+// The test suite stubs `globalThis.fetch` and drives everything through
+// `search()`, so status mapping and envelope validation are covered
+// without the CLI layer.
 
 const PODLENS_ENDPOINT = "https://podlens.net/api/search/semantic";
 
@@ -238,7 +239,7 @@ function isValidSuccessEnvelope(data) {
   if (m.corpus_freshness != null) {
     if (!isPlainObject(m.corpus_freshness)) return false;
     // `newest_date` is a required sub-field when corpus_freshness is
-    // present (SKILL.md contract: always present as string|null). An
+    // present (references/notices.md: always string|null). An
     // absent property is a protocol break — without this presence
     // check, the `nd != null` guard below would early-exit for
     // undefined after R4's structural/content split, letting a {}-
