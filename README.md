@@ -7,50 +7,50 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 7/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 3/20 daily*
 
 ## Results — newest first
 
-### 1. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
-*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 7:20: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=440s
+### 1. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 10:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=605s
 
-> Zvi said the people he trusts most on this question believe 2027 will
-> be 'completely crazy' and 2028 'might be unrecognizable'.
+> The speaker's median isn't 2027 only because they are unsure how
+> accurate that simple modeling is, and they say we should be ready for
+> the milestone to arrive next year.
 
-### 2. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
-*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 8:35: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=515s
+### 2. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 8:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=485s
 
-> Zvi said many people now agree the trajectory is clear: things are
-> already 'low level out of hand', slow-takeoff RSI has already begun at
-> a low level, and by mid-next year things will look much faster.
+> The speaker's median estimate for automated researchers matching the
+> very best human AI researchers is 2028, assuming labs push ahead at
+> full speed and are not slowed by themselves or by governments.
 
-### 3. The Cognitive Revolution — AI:AM Highlights: Clean Neurons, Black October, the GPU Credit Crunch, and Buying the Supply Chain
-*2026-10-24* · https://www.youtube.com/watch?v=ZLgvW9rqdTM · around 0:00: https://www.youtube.com/watch?v=ZLgvW9rqdTM&t=0s
+### 3. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 8:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=485s
 
-> Zvi Mowshowitz (author of 'Don't Worry About the Vase') said that if
-> nothing slows the labs, the gap between advances the size of a current
-> model release could shrink from two months to one month, then two
-> weeks, then one week ('stuff like that could happen').
+> The reasoning behind 2028: in every domain where answers can be
+> checked and AIs get thousands of rounds of practice (competitive
+> programming, well-scoped open math problems), AIs went from worse than
+> most humans to better than the best humans within a few years.
 
-### 4. Nerd Snipe — Meta Thrives While Google Lies
-*2026-10-22* · https://www.youtube.com/watch?v=H0H_zhKnu3U · around 1:09:05: https://www.youtube.com/watch?v=H0H_zhKnu3U&t=4145s
+### 4. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 10:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=605s
 
-> Ben's conservative guess for models handling full open-ended decisions
-> is two to three years at most, or as soon as next year if things
-> accelerate.
+> Plugging METR's finding (Anthropic's rate of progress has doubled)
+> into a takeoff model points straight to 2027.
 
-### 5. Decoder with Nilay Patel — Bill Gates says to prepare for 20 years of tumultuous AI disruption
-*2026-10-22* · https://www.youtube.com/watch?v=A0kTUP7fWtk · around 10:20: https://www.youtube.com/watch?v=A0kTUP7fWtk&t=620s
+### 5. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 0:00: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=0s
 
-> Patel noted that Anthropic does not rule out that Claude might be
-> conscious, that OpenAI's Greg Brockman has said 'we think this is
-> AGI', and that Demis Hassabis has said 'we stand at the foothills of
-> the singularity'.
+> The speaker predicts that automating AI research will pack so much
+> progress into one year that by 2030, and possibly as early as next
+> year, AIs will be at least as good as the best human experts in every
+> field.
 
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-10-26 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-11-14 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 
