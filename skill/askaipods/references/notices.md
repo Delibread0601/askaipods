@@ -14,11 +14,11 @@ Mandatory: an unannotated partial result misrepresents the corpus state as autho
 
 ## Window expansion note (results present, `meta.window.expanded === true` or `meta.window.truncated === true`)
 
-When the requested window holds fewer than 20 matches, the server retries wider windows from `[30, 60, 90]` days (only windows longer than the requested one and within the tier cap). Results inside the requested window are kept, so never say the window was empty. `truncated` means the widening stopped early: a wider window's query errored, or the server's response-time limit passed before one could start — in that second case `expanded` can be `false`.
+When the requested window holds fewer than 20 matches, the server retries wider windows from `[30, 60, 90]` days (only windows longer than the requested one and within the tier cap); a recency search that omitted `--days` starts at 30 days and can widen on to the tier cap. Results inside the initial window are kept, so never say the window was empty. `truncated` means the widening stopped early: a wider window's query errored, or the server's response-time limit passed before one could start — in that second case `expanded` can be `false`.
 
-- `window.expanded === true` and `window.truncated` not `true` → `*Note: Fewer than 20 matches in the requested <requested_days>-day window, so the search widened to the last <served_days> days — results may include episodes older than <requested_days> days.*`
+- `window.expanded === true` and `window.truncated` not `true` → `*Note: Fewer than 20 matches in the initial <requested_days>-day window, so the search widened to the last <served_days> days — results may include episodes older than <requested_days> days.*`
 - `window.truncated === true` and `served_days > requested_days` → `*Note: The search widened to the last <served_days> days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than <requested_days> days. Retry in a moment.*`
-- `window.truncated === true` otherwise → `*Note: Widening the search beyond the requested <requested_days>-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
+- `window.truncated === true` otherwise → `*Note: Widening the search beyond the initial <requested_days>-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
 
 Freshness banners come first when both apply. When you filtered the results to a calendar period, say instead how many returned results fall inside the period.
 
@@ -26,7 +26,7 @@ Freshness banners come first when both apply. When you filtered the results to a
 
 `meta.warning` and `meta.window` are nullable; an absent field falls through to the next step. Use the first step that matches and do not stack messages:
 
-1. `meta.warning?.code === "corpus_stale_for_requested_window"` → "No episodes indexed in the requested window (newest indexed episode: `<meta.corpus_freshness.newest_date>`). Try a longer `--days` value (up to your tier cap of 30 anonymous / 90 free / 365 member; omitting `--days` already searches that cap)." When `meta.window.served_days` already equals `meta.restrictions.max_days`, leave out the longer-`--days` suggestion. Do NOT suggest rephrasing — the cause is freshness, not semantics.
+1. `meta.warning?.code === "corpus_stale_for_requested_window"` → "No episodes indexed in the requested window (newest indexed episode: `<meta.corpus_freshness.newest_date>`). Try a longer `--days` value (up to your tier cap of 30 anonymous / 90 free / 365 member; omitting `--days` already searches up to that cap)." When `meta.window.served_days` already equals `meta.restrictions.max_days`, leave out the longer-`--days` suggestion. Do NOT suggest rephrasing — the cause is freshness, not semantics.
 2. `meta.warning?.code === "index_metadata_stale"` → "Recently indexed episodes are still propagating to the search index — retry in a few minutes."
 3. `meta.warning?.code` is any other value → "No results. The server flagged a freshness issue with this search (code: `<meta.warning.code>`) — results may be incomplete or the requested window may be stale. Try a longer `--days` (up to your tier cap) or retry in a few minutes."
 4. `meta.window?.truncated === true` → the widening was cut short by a transient error or the server's response-time limit; tell the user to retry in a moment (not to rephrase).
@@ -43,7 +43,8 @@ If `meta.quota.refunded === true`, end with: "_This search was refunded — it d
 
 - **`meta.quota`** — `used` and `limit` are always present; `period` is typically `"daily"`; `next_reset` is ISO-8601; `refunded` is optional (above).
 - **`meta.restrictions`** — the tier's caps, e.g. `{ max_days: 365 }` for member, or `{ max_results: 20, max_days: 30, order: "published_at_desc", ... }` for anonymous (`max_days: 90` for free). Take the closing-note cap from `max_days`; never branch the tier on this field.
-- **`meta.window`** — `{ requested_days, served_days, expanded, attempted_days?, reason_code?, truncated? }`, or `null`. `requested_days` is the window applied (the `--days` value capped at the tier max, or the tier max); `served_days` is the last window whose query completed; `reason_code` (`expanded_topk_filled` / `expanded_partial_fill` / `exhausted_windows_empty`) is diagnostic.
+- **`meta.window`** — `{ requested_days, served_days, expanded, attempted_days?, reason_code?, truncated? }`, or `null`. `requested_days` is the first window searched (the `--days` value capped at the tier max; when `--days` is omitted, 30 for recency and the tier max for relevance); `served_days` is the last window whose query completed; `reason_code` (`expanded_topk_filled` / `expanded_partial_fill` / `exhausted_windows_empty`) is diagnostic.
+- **`meta.result_lag`** — `null`, or `{ newest_result_date, corpus_newest_date, days }` when a recency search over one unwidened window wider than 30 days returned a full page whose newest result trails the newest indexed episode by 14 days or more, while that episode is itself no older than 30 days; the banner for it is in SKILL.md.
 - **`meta.corpus_freshness`** — `{ newest_date: "YYYY-MM-DD" | null }`, the newest indexed episode; render `null` as "date unknown".
 - **`meta.cta`** — `null`, or a non-member call to action: anonymous `{ follow: "<url>" }` (safe to ignore), free `{ waitlist: "<url>" }` (used in the free closing note).
 - **`meta.query_hash`** — an opaque hash of the query that the server keeps for its own logs, or `null`. Not needed for rendering; never show it.

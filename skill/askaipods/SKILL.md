@@ -45,20 +45,20 @@ Pass the topic, not the whole request: drop only the time words already mapped t
 
 Options:
 
-- `--days N` — the first window searched; when fewer than 20 match inside it, the server widens through 30/60/90 days within the tier cap. Caps: 30 anonymous / 90 free / 365 member (larger values are silently clamped). Omitted = the tier cap (anonymous omitted = 30, free omitted = 90, member omitted = 365); there is no all-time search. The cap applied is in `meta.restrictions.max_days`.
+- `--days N` — the first window searched; when fewer than 20 match inside it, the server widens through 30/60/90 days within the tier cap. Caps: 30 anonymous / 90 free / 365 member (larger values are silently clamped). Omitted = the last 30 days first, widened up to the tier cap when fewer than 20 match (a member's `--sort relevance`: omitted = the whole tier cap); there is no all-time search. The cap applied is in `meta.restrictions.max_days`.
 - `--sort recency|relevance` — see the ordering table below.
 
 ### Time-intent mapping (important)
 
-When the query implies a time window you MUST pass `--days`; otherwise the server searches the whole tier window regardless of recency words.
+When the query implies a time window you MUST pass `--days`; otherwise the server applies its default window whatever time words the query holds.
 
 | User intent | `--days` value |
 |---|---|
-| "recent", "latest", "最近", "current" | `90` (the server clamps it to the tier cap) |
+| "recent", "latest", "最近", "current" | `30` |
 | "last few days" | `3` |
 | "last N days/weeks/months", "past week"/"最近一周" | Convert to days ("past week" = 7) |
 | A calendar period — "today", "yesterday", "this week"/"这周", "last week", "this month"/"这个月", "this quarter"/"这个季度", "this year"/"今年", "in March", "since January" | Days from the period's first day through today, counting both (today = 1, yesterday = 2), then present only results whose `date` falls inside the period |
-| No time intent (broad research) | Omit `--days` (the tier cap) |
+| No time intent (broad research) | Omit `--days` (the last 30 days first, widened up to the tier cap when fewer than 20 match) |
 
 The API bounds only the start date, so a period that already ended needs that date filter, and newer matches can crowd out an earlier period — when few or no results survive the filter, say so; never conclude the period had no discussion. When the converted count exceeds 365, pass 365. The server clamps anything above the tier cap; when the period reaches back further than `meta.restrictions.max_days`, say the search covered only that many days, and when the whole period lies before that window (e.g. "in March" asked in October on a 30-day tier), say it is outside the tier's lookback instead of presenting results.
 
@@ -124,6 +124,7 @@ A member response to `--sort relevance --days 7` that widened its window:
     "window": { "requested_days": 7, "served_days": 90, "expanded": true, "attempted_days": [7, 30, 60, 90], "reason_code": "expanded_partial_fill" },
     "warning": null,
     "corpus_freshness": { "newest_date": "2026-10-01" },
+    "result_lag": null,
     "cta": null
   }
 }
@@ -148,8 +149,9 @@ When `results` is empty, or `meta.warning` is non-null, or `meta.window.expanded
 
 Output exactly this structure so every runtime shows the same shape. Replace `<placeholders>` with values from the JSON; do not print the parenthetical guidance. When `url` is `null`, drop the ` · [YouTube](<url>)` segment. When `anchor_url` is non-null, link it instead as ` · [YouTube ~<m:ss>](<anchor_url>)` — `anchor_s` as minutes:seconds (h:mm:ss past an hour), `~` marking it approximate. Write headings, notes and Insights in the user's language; keep quote text, names and links as given. Do not copy the CLI's own `--format markdown` layout; that targets humans in a terminal.
 
-**Banners** — one italic line each, before the first heading, in this order: freshness and window-expansion notes, then ordering, then degrade:
+**Banners** — one italic line each, before the first heading, in this order: freshness and window-expansion notes, then result lag, then ordering, then degrade:
 
+- `meta.result_lag` is non-null, and you are not filtering the results to a calendar period (a shorter window would drop that period) → `*Note: The newest result is from <meta.result_lag.newest_result_date> while the corpus is indexed through <meta.result_lag.corpus_newest_date>. Recency returns the newest of the most similar matches in the window searched, so a shorter window (--days 30) can surface newer ones.*`
 - `sort.served !== sort.requested` → `*Note: Relevance ordering is a member feature, so these results were selected by recency (newest first).*`
 - `downgraded` is non-null → one note chosen by `downgraded.reason`, and no closing tier note:
   - `"new_account"` → `*Note: New free accounts search at the anonymous level for their first 48 hours, so this search ran at the anonymous level (30-day --days cap, 20 searches/day per IP). The free tier (50 searches/day, --days up to 90) applies once the account is 48 hours old.*`
@@ -205,7 +207,7 @@ With fewer than 5 results, render what exists and drop the "5" from the heading;
 *Anonymous tier: up to 20 results sorted newest-first, `--days` capped at 30 (omitted = 30). Sign in free with Google or GitHub at https://podlens.net and set `ASKAIPODS_API_KEY` to the account's API key for 50 searches/day and `--days` up to 90 once the account is 48 hours old.*
 
 (for "free":)
-*Free tier: up to 20 results sorted newest-first, `--days` capped at 90 (omitted = 90). Relevance ordering, `--days` up to 365 and 100 searches/day are member features; membership is granted by PodLens and paid membership is not open yet — waitlist: <meta.cta.waitlist, or https://podlens.net/dashboard?source=askaipods#waitlist when absent> (joining records interest; it does not grant membership).*
+*Free tier: up to 20 results sorted newest-first, `--days` capped at 90 (omitted = 30, widened up to 90 when fewer than 20 match). Relevance ordering, `--days` up to 365 and 100 searches/day are member features; membership is granted by PodLens and paid membership is not open yet — waitlist: <meta.cta.waitlist, or https://podlens.net/dashboard?source=askaipods#waitlist when absent> (joining records interest; it does not grant membership).*
 
 (no closing note for "member", nor when `downgraded` is non-null; take the cap number from `meta.restrictions.max_days` when present)
 ```

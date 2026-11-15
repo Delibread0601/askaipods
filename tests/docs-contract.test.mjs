@@ -205,20 +205,35 @@ describe("v0.2.8 — full dates + episode url documented in SKILL.md", () => {
 });
 
 describe("v0.2.9 — search is always bounded to the tier window", () => {
-  // The server resolves an omitted --days to the tier maximum (30
-  // anonymous / 90 free / 365 member); no surface may promise an all-time search
-  // or advise omitting --days to widen one.
+  // The server never searches past the tier maximum (30 anonymous / 90
+  // free / 365 member); no surface may promise an all-time search or
+  // advise omitting --days to get one.
   const RETIRED = /all-time results|omit for all-time|\(all time|no time filter|omitting `?--days`? (for|or)\b|omit it\./i;
   for (const p of ["skill/askaipods/SKILL.md", "README.md", "skill/askaipods/scripts/format.mjs", "skill/askaipods/scripts/cli.mjs"]) {
     test(`${p} carries no all-time / omit-to-widen claim`, () => {
       assert.doesNotMatch(read(p), RETIRED);
     });
   }
-  test("SKILL.md states that an omitted --days means the tier cap", () => {
+  test("SKILL.md, README and --help state the omitted --days default: 30 days first, widened up to the cap", () => {
     const body = read("skill/askaipods/SKILL.md");
-    assert.match(body, /omitted = 30/);
-    assert.match(body, /omitted = 90/);
-    assert.match(body, /omitted = 365/);
+    assert.match(body, /Omitted = the last 30 days first, widened up to the tier cap when fewer than 20 match \(a member's `--sort relevance`: omitted = the whole tier cap\)/);
+    assert.match(body, /`--days` capped at 30 \(omitted = 30\)/);
+    assert.match(body, /`--days` capped at 90 \(omitted = 30, widened up to 90 when fewer than 20 match\)/);
+    assert.doesNotMatch(body, /omitted = (90|365)\b/);
+    assert.match(read("README.md"), /\| \*\*`--days` omitted\*\* \| Last 30 days \| Last 30 days, widened up to 90 when fewer than 20 match \| Last 30 days, widened up to 365 when fewer than 20 match \(`--sort relevance`: 365 days\) \|/);
+    const help = read("skill/askaipods/scripts/cli.mjs");
+    assert.match(help, /omitted = 30, widened up to the cap/);
+    assert.match(help, /a member's --sort relevance: omitted = the cap\)/);
+    assert.doesNotMatch(help, /member 365; omitted = the cap/);
+  });
+
+  test("the result-lag banner in SKILL.md is the note format.mjs prints", () => {
+    const body = read("skill/askaipods/SKILL.md");
+    assert.match(body, /`meta\.result_lag` is non-null, and you are not filtering the results to a calendar period/);
+    const tail = "Recency returns the newest of the most similar matches in the window searched, so a shorter window (";
+    assert.ok(body.includes(tail + "--days 30) can surface newer ones.*"), "SKILL.md banner");
+    assert.ok(read("skill/askaipods/scripts/format.mjs").includes(tail + "\\`--days ${DEFAULT_WINDOW_DAYS}\\`) can surface newer ones.*"), "format.mjs note");
+    assert.match(read("skill/askaipods/references/notices.md"), /\*\*`meta\.result_lag`\*\*/);
   });
 });
 

@@ -22,6 +22,21 @@ function capDays(data, fallback) {
   return Number.isSafeInteger(d) && d > 0 ? d : fallback;
 }
 
+// The server's first window when --days is omitted (recency): the last
+// 30 days, widened up to the tier cap when fewer than 20 match.
+const DEFAULT_WINDOW_DAYS = 30;
+// Results per response.
+const PAGE_SIZE = 20;
+// Smallest gap (days) between the newest result and the newest indexed
+// episode that is worth a note.
+const LAG_NOTE_MIN_DAYS = 14;
+
+function omittedDays(cap) {
+  return cap > DEFAULT_WINDOW_DAYS
+    ? `omitted = ${DEFAULT_WINDOW_DAYS}, widened up to ${cap} when fewer than 20 match`
+    : `omitted = ${cap}`;
+}
+
 // Closing note for the non-member tiers: the cap, and the next step up.
 // Members get none. A degraded request gets the degrade notice instead —
 // the caller is already signed in, so "sign in free" would be wrong.
@@ -30,7 +45,7 @@ function tierNote(data) {
   if (data.tier === "anonymous") {
     const cap = capDays(data, 30);
     return (
-      `Anonymous tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
+      `Anonymous tier: up to 20 results sorted newest-first, --days capped at ${cap} (${omittedDays(cap)}). ` +
       "Sign in free with Google or GitHub at https://podlens.net and set ASKAIPODS_API_KEY to the account's " +
       "API key for 50 searches/day and --days up to 90 once the account is 48 hours old."
     );
@@ -39,7 +54,7 @@ function tierNote(data) {
     const cap = capDays(data, 90);
     const waitlist = waitlistLink(data.meta.cta?.waitlist);
     return (
-      `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
+      `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (${omittedDays(cap)}). ` +
       "Relevance ordering, --days up to 365 and 100 searches/day are member features; membership is granted " +
       "by PodLens and paid membership is not open yet — " +
       `waitlist: ${waitlist} (joining records interest; it does not grant membership).`
@@ -98,6 +113,34 @@ function toUtcMs(dateStr) {
   const ms = Date.parse(dateStr);
   return Number.isNaN(ms) ? null : ms;
 }
+// Recency serves the newest of the most similar matches in the window, so
+// over a wide window the newest result can trail the newest indexed
+// episode by weeks. Reported when a full page from one window wider than
+// the default trails it by LAG_NOTE_MIN_DAYS or more: --days 30 can then
+// surface newer matches. Null otherwise — relevance does not select by
+// date, a short page already holds every match in the window, a widened
+// search kept every match of its narrower windows, and a corpus whose
+// newest episode is older than 30 days has nothing in a 30-day window.
+// `sorted` is newest first with undated results last.
+function resultLag(sortServed, sorted, win, newestDate, nowMs) {
+  if (sortServed !== "recency" || sorted.length < PAGE_SIZE) return null;
+  if (!win || win.expanded || !(win.served_days > DEFAULT_WINDOW_DAYS)) return null;
+  if (typeof newestDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(newestDate)) return null;
+  const corpusMs = Date.parse(newestDate);
+  const resultMs = toUtcMs(sorted[0].published_at);
+  if (Number.isNaN(corpusMs) || resultMs === null) return null;
+  const DAY_MS = 86400000;
+  const corpusDay = Math.floor(corpusMs / DAY_MS);
+  if (Math.floor(nowMs / DAY_MS) - corpusDay > DEFAULT_WINDOW_DAYS) return null;
+  const days = corpusDay - Math.floor(resultMs / DAY_MS);
+  if (days < LAG_NOTE_MIN_DAYS) return null;
+  return {
+    newest_result_date: new Date(resultMs).toISOString().slice(0, 10),
+    corpus_newest_date: newestDate,
+    days,
+  };
+}
+
 export function sortByDateDesc(items) {
   return [...items].sort((a, b) => {
     const am = toUtcMs(a?.published_at);
@@ -131,7 +174,10 @@ export function sortByDateDesc(items) {
 // one, a code field is a short identifier or "unknown", and no string
 // value carries control or format characters (cleanStrings, on the way
 // out).
-export function toStructured(query, response) {
+//
+// `now` is the time the response was received (fetched_at, and the
+// "today" resultLag measures the corpus age against).
+export function toStructured(query, response, now = new Date()) {
   // These fields are guaranteed by client.mjs's success-envelope validator:
   //   response.results (array, each with a non-empty `text`),
   //   response.meta (object), response.meta.access_tier (closed enum),
@@ -148,7 +194,7 @@ export function toStructured(query, response) {
   return cleanStrings({
     tier,
     query,
-    fetched_at: new Date().toISOString(),
+    fetched_at: now.toISOString(),
     render_hint: sort.served === "relevance" ? "dual_view" : "single_view",
     // { requested, served } — the ordering asked for and the one the
     // server ran (relevance is member-only).
@@ -203,6 +249,10 @@ export function toStructured(query, response) {
       // output shape is stable across server versions.
       warning: warning ? { ...warning, code: codeToken(warning.code) } : null,
       corpus_freshness: response.meta.corpus_freshness ?? null,
+      // { newest_result_date, corpus_newest_date, days } when a recency
+      // search over a wide window returned results that trail the newest
+      // indexed episode (see resultLag); else null.
+      result_lag: resultLag(sort.served, sorted, win, response.meta.corpus_freshness?.newest_date, now.getTime()),
       cta: cta && "waitlist" in cta ? { ...cta, waitlist: waitlistLink(cta.waitlist) } : cta ?? null,
     },
   });
@@ -225,12 +275,12 @@ function cleanStrings(value) {
   return value;
 }
 
-export function renderJson(query, response) {
-  return JSON.stringify(toStructured(query, response), null, 2);
+export function renderJson(query, response, now) {
+  return JSON.stringify(toStructured(query, response, now), null, 2);
 }
 
-export function renderMarkdown(query, response) {
-  const data = toStructured(query, response);
+export function renderMarkdown(query, response, now) {
+  const data = toStructured(query, response, now);
   const lines = [];
 
   lines.push(`# askaipods · "${oneLine(query)}"`);
@@ -287,7 +337,7 @@ export function renderMarkdown(query, response) {
       const cap = capDays(data, null);
       const capText = cap ? ` (${cap} days)` : "";
       lines.push(
-        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — a longer \`--days\` helps only up to your tier cap${capText}; omitting \`--days\` already searches the cap.`,
+        `No results in the requested window${asOf}. The indexed corpus has no episodes matching that window — a longer \`--days\` helps only up to your tier cap${capText}; omitting \`--days\` already searches up to the cap.`,
       );
     } else if (warningCode === "index_metadata_stale") {
       lines.push(
@@ -369,8 +419,16 @@ export function renderMarkdown(query, response) {
       win.truncated
         ? win.served_days > win.requested_days
           ? `*Note: The search widened to the last ${win.served_days} days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than ${win.requested_days} days. Retry in a moment.*`
-          : `*Note: Widening the search beyond the requested ${win.requested_days}-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
-        : `*Note: Fewer than 20 matches in the requested ${win.requested_days}-day window, so the search widened to the last ${win.served_days} days — results may include episodes older than ${win.requested_days} days.*`,
+          : `*Note: Widening the search beyond the initial ${win.requested_days}-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
+        : `*Note: Fewer than 20 matches in the initial ${win.requested_days}-day window, so the search widened to the last ${win.served_days} days — results may include episodes older than ${win.requested_days} days.*`,
+    );
+    lines.push("");
+  }
+
+  const lag = data.meta.result_lag;
+  if (lag) {
+    lines.push(
+      `*Note: The newest result is from ${lag.newest_result_date} while the corpus is indexed through ${lag.corpus_newest_date}. Recency returns the newest of the most similar matches in the window searched, so a shorter window (\`--days ${DEFAULT_WINDOW_DAYS}\`) can surface newer ones.*`,
     );
     lines.push("");
   }

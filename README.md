@@ -137,7 +137,8 @@ Your agent will recognize the trigger phrase, invoke `askaipods`, and present th
 | **Daily quota** | 20 searches per IP (IPv6: also 200 per /48 network, shared) | 50 searches per user (anonymous level for the account's first 48 hours) | 100 searches per user |
 | **Results returned** | The 20 newest of the most similar matches (up to 60 per searched window; API returns newest-first; `api_rank` = temporal order) | Same as anonymous | Same by default; with `--sort relevance`, the top 20 by semantic relevance (structured output is emitted newest-first; semantic rank preserved in `api_rank`) |
 | **Text length** | Full text | Full text | Full text |
-| **`--days` cap (omitted = the cap)** | 30 days | 90 days | 365 days |
+| **`--days` cap** | 30 days | 90 days | 365 days |
+| **`--days` omitted** | Last 30 days | Last 30 days, widened up to 90 when fewer than 20 match | Last 30 days, widened up to 365 when fewer than 20 match (`--sort relevance`: 365 days) |
 | **Setup** | Nothing | Sign in free at https://podlens.net (Google or GitHub), then set `ASKAIPODS_API_KEY` to the account's API key | `ASKAIPODS_API_KEY` with a member key |
 | **Access** | n/a | Open sign-up | Granted by PodLens; paid-membership waitlist at https://podlens.net/dashboard?source=askaipods#waitlist |
 

@@ -175,7 +175,7 @@ describe("renderMarkdown — empty result ladder priority", () => {
     assert.doesNotMatch(out, /fuzzed|full dates/);
   });
 
-  test("anonymous note states the bounded default (omitted --days = the cap), 30 without restrictions", () => {
+  test("anonymous note states the bounded default (omitted --days = 30), 30 without restrictions", () => {
     const out = renderMarkdown("q", empty());
     assert.match(out, /--days capped at 30 \(omitted = 30\)/);
     assert.match(out, /--days up to 90/);
@@ -184,7 +184,7 @@ describe("renderMarkdown — empty result ladder priority", () => {
 
   test("anonymous note follows the server's restrictions.max_days (here 90)", () => {
     const out = renderMarkdown("q", empty({ restrictions: { max_results: 20, max_days: 90 } }));
-    assert.match(out, /--days capped at 90 \(omitted = 90\)/);
+    assert.match(out, /--days capped at 90 \(omitted = 30, widened up to 90 when fewer than 20 match\)/);
   });
 
   test("member empty result appends no tier note", () => {
@@ -242,7 +242,7 @@ describe("renderMarkdown — tier, ordering and degrade notices", () => {
       "q",
       nonEmpty(meta3({ access_tier: "free", quota: { used: 2, limit: 50 }, restrictions: { max_days: 90 }, cta: { waitlist } })),
     );
-    assert.match(out, /Free tier: up to 20 results sorted newest-first, --days capped at 90 \(omitted = 90\)/);
+    assert.match(out, /Free tier: up to 20 results sorted newest-first, --days capped at 90 \(omitted = 30, widened up to 90 when fewer than 20 match\)/);
     assert.ok(out.includes(waitlist), "uses meta.cta.waitlist");
     assert.doesNotMatch(out, /source=askaipods/, "fallback not used");
     assert.match(out, /does not grant membership/);
@@ -340,7 +340,7 @@ describe("renderMarkdown — non-empty freshness banner", () => {
       window: { requested_days: 30, served_days: 90, expanded: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /Fewer than 20 matches in the requested 30-day window, so the search widened to the last 90 days — results may include episodes older than 30 days\./);
+    assert.match(out, /Fewer than 20 matches in the initial 30-day window, so the search widened to the last 90 days — results may include episodes older than 30 days\./);
     // Widening can add nothing older, so the note must not assert that it did.
     assert.doesNotMatch(out, /are included/);
     assert.doesNotMatch(out, /No results in the requested/);
@@ -362,7 +362,7 @@ describe("renderMarkdown — non-empty freshness banner", () => {
       window: { requested_days: 7, served_days: 7, expanded: false, attempted_days: [7], truncated: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /Widening the search beyond the requested 7-day window was cut short by a transient error or the server's response-time limit — results may be incomplete\. Retry in a moment/);
+    assert.match(out, /Widening the search beyond the initial 7-day window was cut short by a transient error or the server's response-time limit — results may be incomplete\. Retry in a moment/);
     assert.doesNotMatch(out, /widened to the last/);
   });
 
@@ -380,6 +380,37 @@ describe("renderMarkdown — non-empty freshness banner", () => {
     });
     const out = renderMarkdown("q", env);
     assert.match(out, /widened to the last 30 days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than 7 days\. Retry in a moment/);
+  });
+});
+
+describe("renderMarkdown — result-lag note", () => {
+  function fullPage(metaOverrides = {}) {
+    const results = Array.from({ length: 20 }, () => validResult({ published_at: "2026-10-21" }));
+    return validEnvelope({
+      total: 20,
+      results,
+      meta: {
+        access_tier: "member",
+        quota: { used: 1, limit: 100 },
+        window: { requested_days: 365, served_days: 365, expanded: false },
+        corpus_freshness: { newest_date: "2026-11-14" },
+        ...metaOverrides,
+      },
+    });
+  }
+
+  const NOW = new Date("2026-11-15T12:00:00Z");
+
+  test("a wide recency window whose newest result trails the corpus gets the note before the results", () => {
+    const out = renderMarkdown("q", fullPage(), NOW);
+    const note = "*Note: The newest result is from 2026-10-21 while the corpus is indexed through 2026-11-14. Recency returns the newest of the most similar matches in the window searched, so a shorter window (`--days 30`) can surface newer ones.*";
+    assert.ok(out.includes(note), out.slice(0, 600));
+    assert.ok(out.indexOf(note) < out.indexOf("## Results"));
+  });
+
+  test("no note for the default 30-day window", () => {
+    const out = renderMarkdown("q", fullPage({ window: { requested_days: 30, served_days: 30, expanded: false } }), NOW);
+    assert.doesNotMatch(out, /newest result is from/);
   });
 });
 

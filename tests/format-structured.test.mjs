@@ -430,6 +430,75 @@ describe("toStructured — meta passthrough", () => {
   });
 });
 
+describe("toStructured — meta.result_lag", () => {
+  // A full recency page from one 365-day window whose newest result is
+  // 2026-10-21, against a corpus indexed through 2026-11-14 (24 days on),
+  // received on 2026-11-15.
+  const NOW = new Date("2026-11-15T12:00:00Z");
+  const lagOf = (env, now = NOW) => toStructured("q", env, now).meta.result_lag;
+  function lagEnvelope({ results, meta } = {}) {
+    const rows = results ?? Array.from({ length: 20 }, (_, i) =>
+      validResult({ published_at: i === 7 ? "2026-10-21" : "2026-06-02" }));
+    return validEnvelope({
+      total: rows.length,
+      results: rows,
+      meta: {
+        access_tier: "member",
+        quota: { used: 1, limit: 100 },
+        window: { requested_days: 365, served_days: 365, expanded: false },
+        corpus_freshness: { newest_date: "2026-11-14" },
+        ...meta,
+      },
+    });
+  }
+
+  test("set when a full recency page from a wide window trails the corpus by 14+ days", () => {
+    assert.deepEqual(lagOf(lagEnvelope()), {
+      newest_result_date: "2026-10-21",
+      corpus_newest_date: "2026-11-14",
+      days: 24,
+    });
+  });
+
+  test("14 days is reported, 13 is not", () => {
+    const at = (date) => lagOf(lagEnvelope({ meta: { corpus_freshness: { newest_date: date } } }));
+    assert.equal(at("2026-11-04").days, 14);
+    assert.equal(at("2026-11-03"), null);
+  });
+
+  test("a timestamp result date is compared by its UTC day", () => {
+    const rows = Array.from({ length: 20 }, () => validResult({ published_at: "2026-10-22T05:00:00+09:00" }));
+    const lag = lagOf(lagEnvelope({ results: rows }));
+    assert.equal(lag.newest_result_date, "2026-10-21");
+    assert.equal(lag.days, 24);
+  });
+
+  test("null when narrowing the window could not surface newer matches, or the dates are unusable", () => {
+    const short = Array.from({ length: 19 }, () => validResult({ published_at: "2026-10-21" }));
+    const undated = Array.from({ length: 20 }, () => validResult({ published_at: null }));
+    const cases = {
+      "short page": lagEnvelope({ results: short }),
+      "window not wider than the default": lagEnvelope({ meta: { window: { requested_days: 30, served_days: 30, expanded: false } } }),
+      "widened search": lagEnvelope({ meta: { window: { requested_days: 30, served_days: 365, expanded: true } } }),
+      "no window": lagEnvelope({ meta: { window: undefined } }),
+      "relevance served": lagEnvelope({ meta: { sort: { requested: "relevance", served: "relevance" } } }),
+      "no corpus_freshness": lagEnvelope({ meta: { corpus_freshness: undefined } }),
+      "null newest_date": lagEnvelope({ meta: { corpus_freshness: { newest_date: null } } }),
+      "malformed newest_date": lagEnvelope({ meta: { corpus_freshness: { newest_date: "November 14" } } }),
+      "undated results": lagEnvelope({ results: undated }),
+    };
+    for (const [name, env] of Object.entries(cases)) {
+      assert.equal(lagOf(env), null, name);
+    }
+  });
+
+  test("null once the newest indexed episode is itself outside a 30-day window", () => {
+    // corpus newest 2026-11-14: 30 days old on 12-14 (still inside --days 30), 31 on 12-15
+    assert.equal(lagOf(lagEnvelope(), new Date("2026-12-14T23:00:00Z")).days, 24);
+    assert.equal(lagOf(lagEnvelope(), new Date("2026-12-15T00:00:00Z")), null);
+  });
+});
+
 describe("toStructured — envelope metadata", () => {
   test("query + fetched_at recorded", () => {
     const before = Date.now();

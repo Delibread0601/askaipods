@@ -25,7 +25,8 @@ USAGE:
 OPTIONS:
   --format <json|markdown>   Output format (default: markdown if TTY, json if piped)
   --days <N>                 Search the last N days first (widened through 30/60/90 within the tier cap when fewer than 20 match;
-                             caps: anonymous 30, free 90, member 365; omitted = the cap)
+                             caps: anonymous 30, free 90, member 365; omitted = 30, widened up to the cap —
+                             a member's --sort relevance: omitted = the cap)
   --sort <recency|relevance> Result selection (default: recency). relevance is member-only — other tiers are
                              served recency, reported in the output's sort.served
   --api-key <key>            PodLens API key (overrides ASKAIPODS_API_KEY). Prefer the env var: a key on the
