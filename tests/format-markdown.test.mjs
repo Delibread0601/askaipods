@@ -114,12 +114,14 @@ describe("renderMarkdown — empty result ladder priority", () => {
     assert.doesNotMatch(out, /Try a different phrasing or broader topic\./);
   });
 
-  test("step 4: window.truncated — transient error copy (NO warning)", () => {
+  test("step 4: window.truncated — cut-short copy (NO warning)", () => {
+    // expanded: false + truncated: true is the server's response-time limit passing
+    // before the first wider window could start.
     const env = empty({
-      window: { requested_days: 30, served_days: 90, expanded: false, truncated: true },
+      window: { requested_days: 7, served_days: 7, expanded: false, truncated: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /transient error/);
+    assert.match(out, /cut short by a transient error or the server's response-time limit/);
     assert.match(out, /Try again in a moment/i);
   });
 
@@ -131,7 +133,7 @@ describe("renderMarkdown — empty result ladder priority", () => {
       window: { requested_days: 30, served_days: 90, expanded: true, truncated: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /transient error/);
+    assert.match(out, /cut short by a transient error or the server's response-time limit/);
     assert.doesNotMatch(out, /The API expanded the search window/);
   });
 
@@ -349,8 +351,27 @@ describe("renderMarkdown — non-empty freshness banner", () => {
       window: { requested_days: 7, served_days: 7, expanded: true, truncated: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /interrupted by a transient error — results may be incomplete\. Retry in a moment/);
+    assert.match(out, /cut short by a transient error or the server's response-time limit — results may be incomplete\. Retry in a moment/);
     assert.doesNotMatch(out, /widened to the last/);
+  });
+
+  test("truncated without expansion (server time limit) still emits the note with results", () => {
+    // The server stops starting wider windows once its time limit passes;
+    // ahead of the first one that yields expanded: false + truncated: true.
+    const env = nonEmpty({
+      window: { requested_days: 7, served_days: 7, expanded: false, attempted_days: [7], truncated: true },
+    });
+    const out = renderMarkdown("q", env);
+    assert.match(out, /Widening the search beyond the requested 7-day window was cut short by a transient error or the server's response-time limit — results may be incomplete\. Retry in a moment/);
+    assert.doesNotMatch(out, /widened to the last/);
+  });
+
+  test("no expansion and no truncation emits no window note", () => {
+    const env = nonEmpty({
+      window: { requested_days: 7, served_days: 7, expanded: false, attempted_days: [7] },
+    });
+    const out = renderMarkdown("q", env);
+    assert.doesNotMatch(out, /Widening the search|widened to the last/);
   });
 
   test("truncated after a partial widen names the reached window and the older-episode caveat", () => {
@@ -358,7 +379,7 @@ describe("renderMarkdown — non-empty freshness banner", () => {
       window: { requested_days: 7, served_days: 30, expanded: true, truncated: true },
     });
     const out = renderMarkdown("q", env);
-    assert.match(out, /widened to the last 30 days before a transient error interrupted it — results may be incomplete and may include episodes older than 7 days\. Retry in a moment/);
+    assert.match(out, /widened to the last 30 days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than 7 days\. Retry in a moment/);
   });
 });
 

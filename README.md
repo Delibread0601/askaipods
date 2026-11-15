@@ -11,46 +11,52 @@ $ askaipods "when will AGI arrive"
 
 ## Results — newest first
 
-### 1. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
+### 1. Decoder with Nilay Patel — The OpenAI board member who fired Sam Altman says we still can't trust AI CEOs | Decoder
+*2026-11-14* · https://www.youtube.com/watch?v=dOwqsYtXp6k · around 20:05: https://www.youtube.com/watch?v=dOwqsYtXp6k&t=1205s
+
+> On whether AGI will come from current technology, Toner said it is
+> 'very solidly plausible' and should be prepared for, though not
+> certain in two years; she compared it to planning for a possible
+> Chinese invasion of Taiwan, which most analysts think unlikely but
+> which national security planners still take seriously.
+
+### 2. 42章经 — 复盘 2C 和 2B Agent 发展脉络｜对谈 Afk.surf 创始人嘉琛
+*2026-11-14* · https://www.youtube.com/watch?v=OIY1CvduM4o · around 41:21: https://www.youtube.com/watch?v=OIY1CvduM4o&t=2481s
+
+> Second core view: within two to three years AGI-level models will be
+> widely and cheaply available, since open-source models are improving
+> and catching up at an accelerating pace while today's best models
+> still come mainly from Anthropic and OpenAI.
+
+### 3. Decoder with Nilay Patel — The OpenAI board member who fired Sam Altman says we still can't trust AI CEOs | Decoder
+*2026-11-14* · https://www.youtube.com/watch?v=dOwqsYtXp6k · around 18:05: https://www.youtube.com/watch?v=dOwqsYtXp6k&t=1085s
+
+> Toner said she does not want to say we have AGI, but that AGI is no
+> longer useful as a milestone: it is a 'fuzzy cloud' of definitions,
+> and 'we're inside that cloud', having met some definitions (for
+> example, ChatGPT being general-purpose) but not others (sentience, or
+> doing everything any human can).
+
+### 4. 42章经 — 复盘 2C 和 2B Agent 发展脉络｜对谈 Afk.surf 创始人嘉琛
+*2026-11-14* · https://www.youtube.com/watch?v=OIY1CvduM4o · around 27:53: https://www.youtube.com/watch?v=OIY1CvduM4o&t=1673s
+
+> The guest said many 2025–early-2026 harnesses and dev platforms were
+> patching AI weaknesses rather than adding to its strengths, and
+> claimed that by the second half of 2026 models such as Opus 5.5 and
+> GPT-6 'Extra' deserve the label AGI in most scenarios, making add-ons
+> less useful or obsolete.
+
+### 5. Dwarkesh Podcast — I thought superintelligence was a decade away. Not anymore.
 *2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 10:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=605s
 
 > The speaker's median isn't 2027 only because they are unsure how
 > accurate that simple modeling is, and they say we should be ready for
 > the milestone to arrive next year.
 
-### 2. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
-*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 8:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=485s
-
-> The speaker's median estimate for automated researchers matching the
-> very best human AI researchers is 2028, assuming labs push ahead at
-> full speed and are not slowed by themselves or by governments.
-
-### 3. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
-*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 8:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=485s
-
-> The reasoning behind 2028: in every domain where answers can be
-> checked and AIs get thousands of rounds of practice (competitive
-> programming, well-scoped open math problems), AIs went from worse than
-> most humans to better than the best humans within a few years.
-
-### 4. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
-*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 10:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=605s
-
-> Plugging METR's finding (Anthropic's rate of progress has doubled)
-> into a takeoff model points straight to 2027.
-
-### 5. Dwarkesh Podcast — The avalanche that hit math is coming for AI development
-*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 0:00: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=0s
-
-> The speaker predicts that automating AI research will pack so much
-> progress into one year that by 2030, and possibly as early as next
-> year, AIs will be at least as good as the best human experts in every
-> field.
-
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-11-14 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-11-15 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 

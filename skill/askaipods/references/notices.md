@@ -1,6 +1,6 @@
 # askaipods — notices, empty results, and secondary fields
 
-Read this file when a response has empty `results`, a non-null `meta.warning`, `meta.window.expanded === true`, or `meta.quota.refunded === true`. The common path (results present, none of those set) needs only SKILL.md.
+Read this file when a response has empty `results`, a non-null `meta.warning`, `meta.window.expanded === true`, `meta.window.truncated === true`, or `meta.quota.refunded === true`. The common path (results present, none of those set) needs only SKILL.md.
 
 Banners go with the banners in SKILL.md, as italic lines before the first section heading. An empty-result message takes the place of the result sections; the refund note goes at the end. Never invent quotes to fill an empty result, and never silently swallow a notice.
 
@@ -12,13 +12,13 @@ Mandatory: an unannotated partial result misrepresents the corpus state as autho
 - `meta.warning.code === "index_metadata_stale"` → `*Note: Recently indexed episodes are still propagating to the search index — some relevant matches may be missing. Retry in a few minutes for complete coverage.*`
 - any other code → `*Note: Server flagged a freshness concern with this search (code: <meta.warning.code>) — results may be incomplete.*`
 
-## Window expansion note (results present, `meta.window.expanded === true`)
+## Window expansion note (results present, `meta.window.expanded === true` or `meta.window.truncated === true`)
 
-When the requested window holds fewer than 20 matches, the server retries wider windows from `[30, 60, 90]` days (only windows longer than the requested one and within the tier cap). Results inside the requested window are kept, so never say the window was empty.
+When the requested window holds fewer than 20 matches, the server retries wider windows from `[30, 60, 90]` days (only windows longer than the requested one and within the tier cap). Results inside the requested window are kept, so never say the window was empty. `truncated` means the widening stopped early: a wider window's query errored, or the server's response-time limit passed before one could start — in that second case `expanded` can be `false`.
 
-- `window.truncated` not `true` → `*Note: Fewer than 20 matches in the requested <requested_days>-day window, so the search widened to the last <served_days> days — results may include episodes older than <requested_days> days.*`
-- `window.truncated === true` and `served_days > requested_days` → `*Note: The search widened to the last <served_days> days before a transient error interrupted it — results may be incomplete and may include episodes older than <requested_days> days. Retry in a moment.*`
-- `window.truncated === true` otherwise → `*Note: Widening the search beyond the requested <requested_days>-day window was interrupted by a transient error — results may be incomplete. Retry in a moment.*`
+- `window.expanded === true` and `window.truncated` not `true` → `*Note: Fewer than 20 matches in the requested <requested_days>-day window, so the search widened to the last <served_days> days — results may include episodes older than <requested_days> days.*`
+- `window.truncated === true` and `served_days > requested_days` → `*Note: The search widened to the last <served_days> days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than <requested_days> days. Retry in a moment.*`
+- `window.truncated === true` otherwise → `*Note: Widening the search beyond the requested <requested_days>-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
 
 Freshness banners come first when both apply. When you filtered the results to a calendar period, say instead how many returned results fall inside the period.
 
@@ -29,7 +29,7 @@ Freshness banners come first when both apply. When you filtered the results to a
 1. `meta.warning?.code === "corpus_stale_for_requested_window"` → "No episodes indexed in the requested window (newest indexed episode: `<meta.corpus_freshness.newest_date>`). Try a longer `--days` value (up to your tier cap of 30 anonymous / 90 free / 365 member; omitting `--days` already searches that cap)." When `meta.window.served_days` already equals `meta.restrictions.max_days`, leave out the longer-`--days` suggestion. Do NOT suggest rephrasing — the cause is freshness, not semantics.
 2. `meta.warning?.code === "index_metadata_stale"` → "Recently indexed episodes are still propagating to the search index — retry in a few minutes."
 3. `meta.warning?.code` is any other value → "No results. The server flagged a freshness issue with this search (code: `<meta.warning.code>`) — results may be incomplete or the requested window may be stale. Try a longer `--days` (up to your tier cap) or retry in a few minutes."
-4. `meta.window?.truncated === true` → the widening was interrupted by a transient error; tell the user to retry in a moment (not to rephrase).
+4. `meta.window?.truncated === true` → the widening was cut short by a transient error or the server's response-time limit; tell the user to retry in a moment (not to rephrase).
 5. `meta.window?.expanded === true` → "No quotes found. The API expanded the search from N to M days but found no matches. Try rephrasing or broadening the query." Append "(corpus indexed through `<newest_date>`)" when `meta.corpus_freshness?.newest_date` is present.
 6. Otherwise → "No quotes found for that topic. The corpus covers AI/ML, venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics — for a topic outside these, a web search may serve better; otherwise try rephrasing or broadening the query."
 

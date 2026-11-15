@@ -273,11 +273,13 @@ export function renderMarkdown(query, response) {
     //   1. warning.code = corpus_stale_for_requested_window
     //   2. warning.code = index_metadata_stale
     //   3. warning.code = any other value (forward-compat)
-    //   4. window.truncated (transient fallback error — retry)
+    //   4. window.truncated (widening cut short — retry)
     //   5. window.expanded (API widened the window, still empty)
     //   6. generic (no signal — likely semantic mismatch)
-    // truncated MUST be checked before expanded: when a fallback
-    // Vectorize query errors mid-expansion, both flags are true, and
+    // truncated means the widening stopped early: a wider window's query
+    // errored, or the server's response-time limit passed before one could start
+    // (then expanded can be false). It MUST be checked before expanded:
+    // when a wider query errors mid-expansion both flags are true, and
     // the truncated copy ("retry in a moment") is strictly more
     // actionable than the expanded copy ("rephrase").
     if (warningCode === "corpus_stale_for_requested_window") {
@@ -301,7 +303,7 @@ export function renderMarkdown(query, response) {
       );
     } else if (win && win.truncated) {
       lines.push(
-        "No results found (search window expansion was interrupted by a transient error). Try again in a moment.",
+        "No results found (search window expansion was cut short by a transient error or the server's response-time limit). Try again in a moment.",
       );
     } else if (win && win.expanded) {
       // Step 5 of the references/notices.md ladder appends the
@@ -359,12 +361,15 @@ export function renderMarkdown(query, response) {
   const win = data.meta.window;
   // The server widens when FEWER THAN 20 matched (results inside the
   // requested window are kept), so never claim the window was empty.
-  if (win && win.expanded) {
+  // truncated without expanded is the server's response-time limit passing before
+  // the first wider window could start: nothing widened, and the result
+  // set is still short.
+  if (win && (win.expanded || win.truncated)) {
     lines.push(
       win.truncated
         ? win.served_days > win.requested_days
-          ? `*Note: The search widened to the last ${win.served_days} days before a transient error interrupted it — results may be incomplete and may include episodes older than ${win.requested_days} days. Retry in a moment.*`
-          : `*Note: Widening the search beyond the requested ${win.requested_days}-day window was interrupted by a transient error — results may be incomplete. Retry in a moment.*`
+          ? `*Note: The search widened to the last ${win.served_days} days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than ${win.requested_days} days. Retry in a moment.*`
+          : `*Note: Widening the search beyond the requested ${win.requested_days}-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
         : `*Note: Fewer than 20 matches in the requested ${win.requested_days}-day window, so the search widened to the last ${win.served_days} days — results may include episodes older than ${win.requested_days} days.*`,
     );
     lines.push("");

@@ -41,7 +41,7 @@ node <skill-dir>/scripts/askaipods.mjs search --format json -- <SINGLE_QUOTED_QU
 
 Pass the topic, not the whole request: drop only the time words already mapped to `--days` and filler like "what are people saying about", keep names; for a non-English question, an English rendering of the topic matches the mostly English corpus better. `--` keeps a query that starts with `-` positional. The query must be 1–300 characters after trimming (longer is rejected locally with exit 1).
 
-**Fallback** — only when `scripts/askaipods.mjs` is not available (e.g. the user shared just this file, or Node reports `Cannot find module` for it although the path points into the folder containing this SKILL.md): run the same arguments through the pinned npm release, `npx -y askaipods@0.3.6 search --format json -- <SINGLE_QUOTED_QUERY>`. Keep the exact version; never run an unpinned or `@latest` askaipods. The fallback also needs `registry.npmjs.org` and a writable npm cache.
+**Fallback** — only when `scripts/askaipods.mjs` is not available (e.g. the user shared just this file, or Node reports `Cannot find module` for it although the path points into the folder containing this SKILL.md): run the same arguments through the pinned npm release, `npx -y askaipods@0.3.7 search --format json -- <SINGLE_QUOTED_QUERY>`. Keep the exact version; never run an unpinned or `@latest` askaipods. The fallback also needs `registry.npmjs.org` and a writable npm cache.
 
 Options:
 
@@ -142,7 +142,7 @@ Fields that drive rendering:
 - **`fetched_at`** — when the CLI received the response. For a repeat question on the same topic in one session, reuse the earlier result instead of searching again if it is recent enough (about 30 minutes for time-sensitive questions, about 2 hours for broad research) — every search counts against the daily quota.
 - **No speaker name.** Render `Podcast — Episode` only; do not write "Dario said" unless the text itself attributes the line.
 
-When `results` is empty, or `meta.warning` is non-null, or `meta.window.expanded` is `true`, or `meta.quota.refunded` is `true`, read [references/notices.md](references/notices.md) before rendering — it has the required banners and the empty-result priority ladder. Other `meta` fields are described there too. If that file is not available, still never present such a result as complete: say that the server flagged `<meta.warning.code>`, or that the search widened from `requested_days` to `served_days`, or that no quotes were found (and with a warning set, do not blame the query's wording).
+When `results` is empty, or `meta.warning` is non-null, or `meta.window.expanded` or `meta.window.truncated` is `true`, or `meta.quota.refunded` is `true`, read [references/notices.md](references/notices.md) before rendering — it has the required banners and the empty-result priority ladder. Other `meta` fields are described there too. If that file is not available, still never present such a result as complete: say that the server flagged `<meta.warning.code>`, or that the search widened from `requested_days` to `served_days`, or that widening was cut short (`truncated`) and a retry may return more, or that no quotes were found (and with a warning set, do not blame the query's wording).
 
 ## How to render the response
 
@@ -155,7 +155,7 @@ Output exactly this structure so every runtime shows the same shape. Replace `<p
   - `"new_account"` → `*Note: New free accounts search at the anonymous level for their first 48 hours, so this search ran at the anonymous level (30-day --days cap, 20 searches/day per IP). The free tier (50 searches/day, --days up to 90) applies once the account is 48 hours old.*`
   - `"free_pool_exhausted"` → `*Note: Today's free-tier capacity is used up, so this search ran at the anonymous level (30-day --days cap, 20 searches/day per IP). Paid-membership waitlist: <downgraded.waitlist> — joining records interest; it does not grant membership.*`
   - any other value → `*Note: This search ran at the anonymous level (30-day --days cap, 20 searches/day per IP) instead of the free tier (reason: <downgraded.reason>).*`
-- freshness (`meta.warning` non-null) and window-expansion (`meta.window.expanded`) banners → [references/notices.md](references/notices.md).
+- freshness (`meta.warning` non-null) and window-expansion (`meta.window.expanded` or `meta.window.truncated`) banners → [references/notices.md](references/notices.md).
 
 ### For `render_hint: "dual_view"` (results selected by relevance — a member with `--sort relevance`)
 
