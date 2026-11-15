@@ -11,7 +11,7 @@
 // agent's job is to optionally split that into "Latest" and "Top
 // Relevant" sub-views — see SKILL.md.
 
-import { WAITLIST_URL, oneLine } from "./shared.mjs";
+import { codeToken, lineOr, oneLine, stripInvisible, waitlistLink } from "./shared.mjs";
 
 // The tier's --days cap as the server reported it (meta.restrictions
 // .max_days), so the copy stays right on servers with different caps.
@@ -37,7 +37,7 @@ function tierNote(data) {
   }
   if (data.tier === "free") {
     const cap = capDays(data, 90);
-    const waitlist = typeof data.meta.cta?.waitlist === "string" ? oneLine(data.meta.cta.waitlist) : WAITLIST_URL;
+    const waitlist = waitlistLink(data.meta.cta?.waitlist);
     return (
       `Free tier: up to 20 results sorted newest-first, --days capped at ${cap} (omitted = ${cap}). ` +
       "Relevance ordering, --days up to 365 and 100 searches/day are member features; membership is granted " +
@@ -51,13 +51,11 @@ function tierNote(data) {
 // Degrade notice, by `downgraded.reason`: today's free-tier capacity is
 // used up, the account is inside its first 48 hours, or (a reason this
 // version does not know) a neutral statement of the level served.
+// toStructured has already reduced `from` / `reason` to code tokens and
+// `waitlist` to a podlens.net link.
 function downgradeNote(data) {
-  if (!data.downgraded) return null;
-  const d = {
-    from: oneLine(data.downgraded.from),
-    reason: oneLine(data.downgraded.reason),
-    waitlist: oneLine(data.downgraded.waitlist),
-  };
+  const d = data.downgraded;
+  if (!d) return null;
   const level = `the anonymous level (--days cap ${capDays(data, 30)}, 20 searches/day per IP)`;
   if (d.reason === "free_pool_exhausted") {
     return (
@@ -127,6 +125,12 @@ export function sortByDateDesc(items) {
 // that bypasses client.search() and hands toStructured a malformed
 // response will get a TypeError — that's louder than a silent fallback
 // and matches the "protocol break → exit 3" philosophy of client.mjs.
+//
+// Both renderers read this payload, so the rules for server strings are
+// applied here once: a waitlist link is a podlens.net link or the built-in
+// one, a code field is a short identifier or "unknown", and no string
+// value carries control or format characters (cleanStrings, on the way
+// out).
 export function toStructured(query, response) {
   // These fields are guaranteed by client.mjs's success-envelope validator:
   //   response.results (array, each with a non-empty `text`),
@@ -135,13 +139,13 @@ export function toStructured(query, response) {
   //   (object). Read them directly. The remaining fields below
   //   (meta.query_hash, meta.restrictions, ...) are optional per the
   //   server contract and keep their `?? null` defaults.
-  const { access_tier: tier, sort } = response.meta;
+  const { access_tier: tier, sort, downgraded, warning, cta, window: win } = response.meta;
   const apiResults = response.results;
 
   const withRank = apiResults.map((r, idx) => ({ ...r, api_rank: idx + 1 }));
   const sorted = sortByDateDesc(withRank);
 
-  return {
+  return cleanStrings({
     tier,
     query,
     fetched_at: new Date().toISOString(),
@@ -153,7 +157,14 @@ export function toStructured(query, response) {
     // level (reason "free_pool_exhausted": today's free-tier capacity is
     // used up; "new_account": the account is younger than 48 hours); else
     // null.
-    downgraded: response.meta.downgraded ?? null,
+    downgraded: downgraded
+      ? {
+          ...downgraded,
+          from: codeToken(downgraded.from),
+          reason: codeToken(downgraded.reason),
+          waitlist: waitlistLink(downgraded.waitlist),
+        }
+      : null,
     results: sorted.map((r) => ({
       podcast: r.podcast_name ?? null,
       episode: r.episode_title ?? null,
@@ -175,24 +186,43 @@ export function toStructured(query, response) {
       quota: response.meta.quota,
       restrictions: response.meta.restrictions ?? null,
       query_hash: response.meta.query_hash ?? null,
-      window: response.meta.window ?? null,
-      // New honesty signals (server audit 2026-04-17 → 2026-04-19):
+      // reason_code is a diagnostic code; kept as a code token.
+      window: win && typeof win.reason_code === "string" ? { ...win, reason_code: codeToken(win.reason_code) } : win ?? null,
+      // Honesty signals:
       //   warning.code       — "corpus_stale_for_requested_window" or
       //                        "index_metadata_stale"; tells the agent
       //                        the empty/partial result is a freshness
       //                        issue rather than a semantic mismatch.
+      //                        Kept as a code token.
       //   corpus_freshness   — { newest_date: "YYYY-MM-DD" | null };
       //                        lets the agent render "data as of X".
       //   cta                — non-member call-to-action (anonymous:
       //                        follow URL; free: paid-membership
-      //                        waitlist URL) passed through unchanged.
+      //                        waitlist URL, kept as a podlens.net link).
       // All three are optional — defaulted to null so the structured
       // output shape is stable across server versions.
-      warning: response.meta.warning ?? null,
+      warning: warning ? { ...warning, code: codeToken(warning.code) } : null,
       corpus_freshness: response.meta.corpus_freshness ?? null,
-      cta: response.meta.cta ?? null,
+      cta: cta && "waitlist" in cta ? { ...cta, waitlist: waitlistLink(cta.waitlist) } : cta ?? null,
     },
-  };
+  });
+}
+
+// Every string value in the payload without control or format characters
+// (stripInvisible in shared.mjs). A key that carries such characters is
+// dropped, not renamed: renamed, it would take the place of the checked
+// field of the same name.
+function cleanStrings(value) {
+  if (typeof value === "string") return stripInvisible(value);
+  if (Array.isArray(value)) return value.map(cleanStrings);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([k]) => stripInvisible(k) === k)
+        .map(([k, v]) => [k, cleanStrings(v)]),
+    );
+  }
+  return value;
 }
 
 export function renderJson(query, response) {
@@ -207,7 +237,7 @@ export function renderMarkdown(query, response) {
   lines.push("");
 
   const quota = data.meta.quota;
-  const quotaLabel = `${quota.used}/${quota.limit} ${oneLine(quota.period ?? "daily")}`;
+  const quotaLabel = `${quota.used}/${quota.limit} ${lineOr(quota.period, "daily")}`;
   // Server's P1-b narrow refund: when corpus is stale AND delivered
   // results are empty, the quota slot is refunded (see server CLAUDE.md
   // §Three-Tier Search Access). Surface as a trailing tag so the user
@@ -232,7 +262,7 @@ export function renderMarkdown(query, response) {
 
   if (data.results.length === 0) {
     const win = data.meta.window;
-    const warningCode = data.meta.warning?.code && oneLine(data.meta.warning.code);
+    const warningCode = data.meta.warning?.code;
     const newest = data.meta.corpus_freshness?.newest_date;
     // Priority: freshness warnings take precedence over window/expansion
     // messaging because they tell the user something stronger — the
@@ -302,7 +332,7 @@ export function renderMarkdown(query, response) {
   // the user knows the set is incomplete rather than authoritative.
   // Placed before the expansion note so freshness signals dominate —
   // same priority intent as the empty-branch ladder.
-  const warningCode = data.meta.warning?.code && oneLine(data.meta.warning.code);
+  const warningCode = data.meta.warning?.code;
   const newest = data.meta.corpus_freshness?.newest_date;
   if (warningCode === "corpus_stale_for_requested_window") {
     const asOf = newest ? ` (newest indexed episode: ${newest})` : "";
@@ -345,8 +375,8 @@ export function renderMarkdown(query, response) {
 
   for (let i = 0; i < data.results.length; i++) {
     const r = data.results[i];
-    const title = oneLine(r.episode ?? "") || "Untitled episode";
-    const podcast = oneLine(r.podcast ?? "") || "Unknown podcast";
+    const title = lineOr(r.episode, "Untitled episode");
+    const podcast = lineOr(r.podcast, "Unknown podcast");
     const date = r.date ?? "date unknown";
     lines.push(`### ${i + 1}. ${podcast} — ${title}`);
     // Bare URL rather than a [label](url) link: terminals and GFM

@@ -121,6 +121,12 @@ describe("isValidSuccessEnvelope — result-row shape checks", () => {
     );
   });
 
+  test("rejects text with nothing visible in it (control and format characters only)", async () => {
+    for (const text of ["\u0001\u001b", "\u202E\u200B", " \u{E0041}\u{E0042} ", "\u200D\u200C", "\u200D \u200C", "\u200D\n\u200D", "\u200C\u0000\u200D"]) {
+      await expectEnvelopeRejected(validEnvelope({ total: 1, results: [validResult({ text })] }));
+    }
+  });
+
   test("accepts null episode_title (allowed missing)", async () => {
     const env = validEnvelope({
       total: 1,

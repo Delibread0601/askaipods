@@ -198,6 +198,18 @@ describe("search — HTTP error → exit-code mapping", () => {
     assert.doesNotMatch(err.message, /temporarily unavailable/i);
   });
 
+  test("503 with code daily_capacity_reached → exit 2 whatever the error text says", async () => {
+    mockResponse({ status: 503, body: { error: "Come back tomorrow.", code: "daily_capacity_reached" } });
+    const err = await runAndCatch();
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /daily capacity for anonymous-level searches is used up/);
+  });
+
+  test("503 with another code and other text stays exit 3", async () => {
+    mockResponse({ status: 503, body: { error: "Vector search unavailable", code: "vectorize" } });
+    assert.equal((await runAndCatch()).exitCode, 3);
+  });
+
   test("transient 503 (any other error text) stays exit 3", async () => {
     mockResponse({
       status: 503,
@@ -403,6 +415,21 @@ describe("search — 429 tier-aware quota messaging", () => {
     assert.match(err.message, /rate limited/i);
   });
 
+  test("429 carrying meta.quota → exit 2 whatever the error text says", async () => {
+    mockResponse({
+      status: 429,
+      body: { error: "Daily search limit reached", meta: { access_tier: "member", quota: { used: 100, limit: 100 } } },
+    });
+    const err = await runAndCatch({ apiKey: "k1" });
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /member tier: 100\/day/);
+  });
+
+  test("429 with meta but no meta.quota and no 'quota' text → exit 3 rate-limit", async () => {
+    mockResponse({ status: 429, body: { error: "Too many requests", meta: { access_tier: "member" } } });
+    assert.equal((await runAndCatch()).exitCode, 3);
+  });
+
   test("429 case-insensitive 'QUOTA' string still maps to exit 2", async () => {
     mockResponse({
       status: 429,
@@ -431,6 +458,29 @@ describe("search — server text in error messages is terminal-safe", () => {
     });
   }
 
+  test("error text with nothing visible in it falls back to the built-in detail", async () => {
+    mockResponse({ status: 400, body: { error: "\u200D \u200C" } });
+    assert.equal((await runAndCatch()).message, "invalid request: bad request");
+    mockResponse({ status: 503, body: { error: "\u202E\u001b" } });
+    assert.equal((await runAndCatch()).message, "podlens.net temporarily unavailable: service unavailable");
+  });
+
+  test("an error value that cannot be turned into a string does not break 429 / 503 classification", async () => {
+    const hostile = { toString: null, valueOf: null };
+    mockResponse({ status: 429, body: { error: hostile, meta: { access_tier: "member", quota: { used: 100, limit: 100 } } } });
+    const quota = await runAndCatch({ apiKey: "k1" });
+    assert.ok(quota instanceof AskaipodsError);
+    assert.equal(quota.exitCode, 2);
+    mockResponse({ status: 429, body: { error: hostile } });
+    assert.equal((await runAndCatch()).exitCode, 3);
+    mockResponse({ status: 503, body: { error: hostile, code: "daily_capacity_reached" } });
+    assert.equal((await runAndCatch()).exitCode, 2);
+    mockResponse({ status: 503, body: { error: hostile } });
+    const transient = await runAndCatch();
+    assert.equal(transient.exitCode, 3);
+    assert.equal(transient.message, "podlens.net temporarily unavailable: service unavailable");
+  });
+
   test("a non-string error falls back instead of printing [object Object]", async () => {
     mockResponse({ status: 400, body: { error: { nested: true } } });
     assert.equal((await runAndCatch()).message, "invalid request: bad request");
@@ -442,7 +492,7 @@ describe("search — server text in error messages is terminal-safe", () => {
     assert.equal((await runAndCatch()).message, "podlens.net error (HTTP 500): no detail given");
   });
 
-  test("429 degrade copy cleans the server's waitlist link, and falls back when it is unusable", async () => {
+  test("429 degrade copy prints only a podlens.net waitlist link, else the built-in one", async () => {
     const degraded = (waitlist) => ({
       status: 429,
       body: {
@@ -454,14 +504,23 @@ describe("search — server text in error messages is terminal-safe", () => {
         },
       },
     });
-    mockResponse(degraded("https://podlens.net/w\u001b[31m\n# x"));
-    const dirty = await runAndCatch({ apiKey: "k1" });
-    assert.equal(dirty.exitCode, 2);
-    assert.doesNotMatch(dirty.message, UNSAFE);
-    assert.match(dirty.message, /Paid-membership waitlist: https:\/\/podlens\.net\/w \[31m # x \(joining/);
-    mockResponse(degraded("\u001b"));
-    const empty = await runAndCatch({ apiKey: "k1" });
-    assert.match(empty.message, /Paid-membership waitlist: https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist/);
+    const BUILT_IN = /Paid-membership waitlist: https:\/\/podlens\.net\/dashboard\?source=askaipods#waitlist \(joining/;
+    for (const bad of [
+      "https://podlens.net/w\u001b[31m\n# x",
+      "https://evil.example/login",
+      "https://podlens.net.evil.example/",
+      "http://podlens.net/dashboard",
+      "https://podlens.net/w) [x](https://evil.example",
+      "\u001b",
+      42,
+    ]) {
+      mockResponse(degraded(bad));
+      const err = await runAndCatch({ apiKey: "k1" });
+      assert.equal(err.exitCode, 2);
+      assert.doesNotMatch(err.message, UNSAFE);
+      assert.doesNotMatch(err.message, /evil|\[31m/);
+      assert.match(err.message, BUILT_IN, `${JSON.stringify(bad)} → built-in link`);
+    }
   });
 });
 

@@ -8,7 +8,7 @@
 // `search()`, so status mapping and envelope validation are covered
 // without the CLI layer.
 
-import { WAITLIST_URL, oneLine } from "./shared.mjs";
+import { WAITLIST_URL, hasVisibleText, lineOr, waitlistLink } from "./shared.mjs";
 
 const PODLENS_ENDPOINT = "https://podlens.net/api/search/semantic";
 
@@ -87,9 +87,9 @@ function isValidPublishedAt(v) {
 const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{11}$/;
 
 // Validate the PodLens success envelope against the documented contract.
-// Any mismatch is treated as a protocol break and surfaces as exit 3 —
-// better a loud AskaipodsError(exitCode=3) than a TypeError escaping as
-// exit 1 when format.mjs tries to operate on malformed fields.
+// Any mismatch is treated as a protocol break and surfaces as exit 3
+// with a message that names the cause, instead of a bare TypeError from
+// format.mjs operating on malformed fields.
 //
 // Required envelope:
 //   data                       : non-array object
@@ -133,9 +133,9 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                 freshness banner in non-empty render)
 //   data.meta.corpus_freshness  — {newest_date: string|null} iff present
 //                                 (the "data as of X" signal)
-//   data.meta.cta               — object iff present (tierNote reads
+//   data.meta.cta               — object iff present (format.mjs reads
 //                                 cta.waitlist for the free-tier note
-//                                 and type-checks that field itself)
+//                                 and checks that link itself)
 //   data.meta.downgraded        — {from, reason, waitlist} strings iff
 //                                 present; drives the degrade notice
 function isValidSuccessEnvelope(data) {
@@ -144,10 +144,11 @@ function isValidSuccessEnvelope(data) {
   if (!Array.isArray(data.results)) return false;
   for (const item of data.results) {
     if (!isPlainObject(item)) return false;
-    // text must be a non-empty, non-whitespace-only string. An all-
-    // whitespace text would otherwise render as an empty blockquote
-    // row (`> ` with nothing after it) in --format markdown.
-    if (typeof item.text !== "string" || item.text.trim().length === 0) return false;
+    // text must be a string with something visible in it. Whitespace,
+    // control characters, format characters and joiners alone would
+    // render as an empty blockquote row (`> ` with nothing after it) in
+    // --format markdown, and as an empty quote for an agent.
+    if (typeof item.text !== "string" || !hasVisibleText(item.text)) return false;
     // `!= null` intentionally matches both null and undefined (contract
     // allows either as "missing"), but rejects numbers, objects, arrays.
     if (item.episode_title != null && typeof item.episode_title !== "string") return false;
@@ -238,9 +239,9 @@ function isValidSuccessEnvelope(data) {
       }
     }
   }
-  // cta: format.mjs tierNote reads `cta.waitlist` for the free-tier
-  // closing note, type-checking it there and falling back to
-  // WAITLIST_URL, so only the null-or-object shape is checked here.
+  // cta: format.mjs reads `cta.waitlist` for the free-tier closing note
+  // and replaces anything but a podlens.net link with WAITLIST_URL, so
+  // only the null-or-object shape is checked here.
   if (m.cta != null && !isPlainObject(m.cta)) return false;
   // window shape-check: format.mjs renderMarkdown reads
   // `window.truncated`, `window.expanded`, `window.requested_days`,
@@ -269,13 +270,11 @@ function isValidSuccessEnvelope(data) {
   return true;
 }
 
-// Server-supplied text on its way into an error message, which goes to
-// the terminal on stderr: one line, control characters and bidi overrides
-// removed (see oneLine in shared.mjs). Anything that is not a non-empty
-// string yields the fallback.
-function serverText(value, fallback) {
-  const text = typeof value === "string" ? oneLine(value) : "";
-  return text || fallback;
+// The server's `error` field as a string for matching; "" when the body
+// is not an object or the field is not a string. No coercion: String() on
+// an arbitrary JSON value can throw.
+function errorString(data) {
+  return typeof data?.error === "string" ? data.error : "";
 }
 
 // Daily-quota (429) copy. The 429 envelope carries the same tier fields
@@ -306,7 +305,7 @@ function quotaExhaustedMessage(meta, apiKey) {
       );
     }
     if (reason === "free_pool_exhausted") {
-      const waitlist = serverText(meta.downgraded.waitlist, WAITLIST_URL);
+      const waitlist = waitlistLink(meta.downgraded.waitlist);
       return (
         "daily search quota exhausted (today's free-tier capacity is used up, so this request ran at the " +
         `anonymous level — ${level} — and ${usedUp} too). ${reset} ` +
@@ -349,9 +348,12 @@ function quotaExhaustedMessage(meta, apiKey) {
 
 // The server's site-wide anonymous-level pool (shared by anonymous callers
 // and by free callers served at the anonymous level) answers exhaustion
-// with 503 and this error text, without Retry-After — unlike its transient
-// 503s, which carry Retry-After: 30. It lasts until the UTC day rolls over,
-// so it maps to exit 2 (stop for today), not exit 3 (retry).
+// with 503 and `code: "daily_capacity_reached"` in the body — unlike its
+// transient 503s, which carry no code. It lasts until the UTC day rolls
+// over, so it maps to exit 2 (stop for today), not exit 3 (retry). The
+// code is the contract; the error text is matched too, for a response
+// that carries the text without the code.
+const CAPACITY_REACHED_CODE = "daily_capacity_reached";
 const CAPACITY_REACHED = /daily capacity reached/i;
 
 // Connection-level failure codes a network-blocking sandbox produces
@@ -494,23 +496,25 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
     return data;
   }
 
-  // Distinguish 429 cases by inspecting the message: the server uses
-  // distinct strings for "burst limit hit" vs "daily quota exhausted",
-  // and only the latter warrants the "daily quota" exit code. The
-  // quota message is tier-aware: a member hitting the 100/day cap must
-  // not be told to sign in — they already have a key.
+  // Two 429s: the daily quota (exit 2) and the burst limit (exit 3). The
+  // daily-quota body carries `meta.quota`, the burst one carries no meta,
+  // so the structure decides; the error text is matched too, for a quota
+  // response without meta. The quota message is tier-aware: a member
+  // hitting the 100/day cap must not be told to sign in — they already
+  // have a key.
   if (response.status === 429) {
-    const msg = String(data?.error ?? "").toLowerCase();
-    if (msg.includes("quota")) {
-      const meta = isPlainObject(data) && isPlainObject(data.meta) ? data.meta : null;
+    const meta = isPlainObject(data) && isPlainObject(data.meta) ? data.meta : null;
+    const msg = errorString(data).toLowerCase();
+    if (isPlainObject(meta?.quota) || msg.includes("quota")) {
       throw exitErr(2, quotaExhaustedMessage(meta, apiKey));
     }
     throw exitErr(3, "rate limited by podlens.net (too many requests in a short window). Retry in a minute.");
   }
 
-  // The server's own error text, else the HTTP status text — both are
-  // remote strings, so both go through serverText.
-  const errorText = serverText(data?.error, serverText(response.statusText, "no detail given"));
+  // The server's own error text, else the HTTP status text. Both are
+  // remote strings on their way to the terminal on stderr, so both go
+  // through lineOr (shared.mjs).
+  const errorText = lineOr(data?.error, lineOr(response.statusText, "no detail given"));
 
   if (response.status === 401 || response.status === 403) {
     throw exitErr(1, `API key rejected: ${errorText}`);
@@ -521,14 +525,14 @@ export async function search({ query, days, sort, apiKey, endpoint = PODLENS_END
   }
 
   if (response.status === 503) {
-    if (CAPACITY_REACHED.test(String(data?.error ?? ""))) {
+    if (data?.code === CAPACITY_REACHED_CODE || CAPACITY_REACHED.test(errorString(data))) {
       throw exitErr(2, capacityReachedMessage());
     }
-    throw exitErr(3, `podlens.net temporarily unavailable: ${serverText(data?.error, "service unavailable")}`);
+    throw exitErr(3, `podlens.net temporarily unavailable: ${lineOr(data?.error, "service unavailable")}`);
   }
 
   if (response.status === 400) {
-    throw exitErr(1, `invalid request: ${serverText(data?.error, "bad request")}`);
+    throw exitErr(1, `invalid request: ${lineOr(data?.error, "bad request")}`);
   }
 
   throw exitErr(3, `podlens.net error (HTTP ${response.status}): ${errorText}`);
