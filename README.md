@@ -7,7 +7,7 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 3/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 8/20 daily*
 
 ## Results — newest first
 

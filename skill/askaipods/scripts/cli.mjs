@@ -14,7 +14,7 @@ import { parseArgs } from "node:util";
 import { search, AskaipodsError, SORT_VALUES } from "./client.mjs";
 import { renderJson, renderMarkdown } from "./format.mjs";
 
-const VERSION = "0.3.7";
+const VERSION = "0.3.8";
 
 const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
 
