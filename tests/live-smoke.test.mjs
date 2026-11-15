@@ -268,7 +268,7 @@ describe("live-smoke — runner", () => {
   });
 
   test("an empty option value is a usage error, not an option left out", () => {
-    for (const args of [["--replay", ""], ["--out", ""], ["--replay", " "], ["--query", ""]]) {
+    for (const args of [["--replay", ""], ["--out", ""], ["--replay", " "], ["--query", ""], ["--query", "\u200B"]]) {
       const child = run(args);
       assert.equal(child.status, 64, args.join(" "));
       assert.match(child.stderr, /needs a value/);
@@ -276,6 +276,27 @@ describe("live-smoke — runner", () => {
     }
     assert.equal(run(["--help"]).status, 0);
     assert.equal(run(["--replay", "x", "--local"]).status, 64);
+  });
+
+  test("--out refuses a directory that holds a saved output, before anything runs", () => {
+    withDir((dir) => {
+      save(dir, { "keyed-days1": healthy["keyed-days1"] });
+      const child = run(["--out", dir]);
+      assert.equal(child.status, 64);
+      assert.match(child.stderr, /already holds saved outputs \(keyed-days1\.json\); use a new directory/);
+      assert.equal(child.stdout, "");
+    });
+  });
+
+  test("--replay: a --query with outer whitespace and an invisible character matches the query the CLI echoes", () => {
+    withDir((dir) => {
+      save(dir, healthy);
+      // Whitespace inside the invisible characters: trimming before they are
+      // removed would leave it in place.
+      const child = run(["--replay", dir, "--query", `\u200B ${QUERY} \u200B`]);
+      assert.match(child.stdout, /live-smoke: PASS — 6 of 6/);
+      assert.equal(child.status, 0);
+    });
   });
 
   test("a failed version check stops the run before any search", () => {
@@ -299,6 +320,7 @@ if (args.includes("--version")) {
 }
 if (key) console.error("error: the server rejected " + key);
 if (key && process.env.STUB_EXIT) process.exit(Number(process.env.STUB_EXIT));
+if (args.at(-1) !== ${JSON.stringify(QUERY)}) process.exit(64);
 const name = (key ? "keyed-" : "anonymous-") + (args.includes("--days") ? "days1" : args.includes("--sort") ? "relevance" : "default");
 process.stdout.write(readFileSync(process.env.STUB_DIR + "/" + name + ".json", "utf8"));
 `;
@@ -324,8 +346,18 @@ process.stdout.write(readFileSync(process.env.STUB_DIR + "/" + name + ".json", "
       assert.deepEqual(readdirSync(out).sort(), SCENARIOS.map((s) => `${s.name}.json`).sort());
       const saved = readdirSync(out).map((f) => readFileSync(join(out, f), "utf8"));
       for (const text of [child.stdout, child.stderr, ...saved]) assert.ok(!text.includes(KEY));
-      const noKey = live([]);
+      // An existing empty directory is a new one; the query reaches the CLI
+      // trimmed and without its invisible character.
+      const empty = join(dir, "empty");
+      mkdirSync(empty);
+      const noKey = live(["--out", empty, "--query", ` ${QUERY}\u200B `]);
       assert.match(noKey.stdout, /live-smoke: PASS — 3 of 6 scenario\(s\) checked, 3 skipped/);
+      assert.equal(readdirSync(empty).length, 3);
+      // A second run into the first directory is refused: after a partial
+      // failure its older files would pass a replay as this run's.
+      const again = live(["--out", out], { ASKAIPODS_API_KEY: KEY, STUB_EXIT: "2" });
+      assert.equal(again.status, 64);
+      assert.equal(again.stdout, "");
     });
   });
 

@@ -26,11 +26,12 @@
 // Not shipped: package.json `files` leaves scripts/ out of the npm package.
 
 import { spawnSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
+import { stripInvisible } from "../skill/askaipods/scripts/shared.mjs";
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -248,7 +249,7 @@ export function checkAcross(outputs) {
 }
 
 const USAGE =
-  "usage: node scripts/live-smoke.mjs [--local | --version <x.y.z>] [--query <text>] [--out <dir>]\n" +
+  "usage: node scripts/live-smoke.mjs [--local | --version <x.y.z>] [--query <text>] [--out <new dir>]\n" +
   "       node scripts/live-smoke.mjs --replay <dir> [--query <text>]";
 
 function usage(message) {
@@ -287,13 +288,24 @@ async function main() {
   }
   // An empty value (an unset shell variable in `--replay "$DIR"`) must not
   // read as "option not given": that would turn a replay into a live run.
-  for (const name of ["version", "query", "out", "replay"]) {
+  for (const name of ["version", "out", "replay"]) {
     if (values[name] !== undefined && values[name].trim() === "") usage(`--${name} needs a value`);
   }
   if (values.replay && (values.local || values.version || values.out)) usage("--replay takes no --local / --version / --out");
   if (values.local && values.version) usage("--local and --version are exclusive");
+  // A scenario that fails writes no file, so in a directory that already
+  // holds saved outputs the earlier run's file would stay, and --replay
+  // would then check a mix of two runs. Refused before any search is spent.
+  if (values.out) {
+    const kept = SCENARIOS.map((s) => `${s.name}.json`).filter((file) => existsSync(join(values.out, file)));
+    if (kept.length) usage(`--out ${values.out} already holds saved outputs (${kept.join(", ")}); use a new directory`);
+  }
 
-  const query = values.query ?? DEFAULT_QUERY;
+  // The CLI trims the query and drops invisible characters from the one it
+  // echoes. Doing both here first leaves a string the CLI returns as it
+  // is, so the query sent, the one compared and the one replayed agree.
+  const query = stripInvisible(values.query ?? DEFAULT_QUERY).trim();
+  if (query === "") usage("--query needs a value");
   const packageVersion = JSON.parse(readFileSync(join(REPO, "package.json"), "utf8")).version;
   const version = values.version ?? packageVersion;
   const key = (process.env.ASKAIPODS_API_KEY ?? "").trim();
