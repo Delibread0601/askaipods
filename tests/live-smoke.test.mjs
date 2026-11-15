@@ -1,13 +1,13 @@
 // Offline tests for scripts/live-smoke.mjs: the contract checks it applies
 // to live output, run here on payloads built by toStructured. Nothing in
 // this file touches the network: importing the script starts nothing, and
-// the runner tests execute it with --replay, or with an empty PATH so that
-// no package runner can start.
+// the runner tests execute it with --replay, with an empty PATH so that no
+// package runner can start, or with a PATH holding only a stand-in npx.
 
 import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -284,6 +284,60 @@ describe("live-smoke — runner", () => {
     assert.equal((child.stdout.match(/not run: the version check failed/g) ?? []).length, 6);
     assert.match(child.stdout, /live-smoke: FAIL — 0 of 6 scenario\(s\) checked, 6 skipped, 1 failure\(s\)/);
     assert.equal(child.status, 1);
+  });
+
+  // A stand-in npx, the only program on PATH: it answers --version with the
+  // version it was asked for and prints a saved output per search — the
+  // keyed one when the key is in its environment — so the live branch runs
+  // end to end offline. It writes the key to stderr on every keyed call.
+  const STUB = `import { readFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const key = process.env.ASKAIPODS_API_KEY;
+if (args.includes("--version")) {
+  console.log(args.find((a) => a.startsWith("askaipods@")).replace("@", " "));
+  process.exit(0);
+}
+if (key) console.error("error: the server rejected " + key);
+if (key && process.env.STUB_EXIT) process.exit(Number(process.env.STUB_EXIT));
+const name = (key ? "keyed-" : "anonymous-") + (args.includes("--days") ? "days1" : args.includes("--sort") ? "relevance" : "default");
+process.stdout.write(readFileSync(process.env.STUB_DIR + "/" + name + ".json", "utf8"));
+`;
+  const KEY = "pk_test_0123456789abcdef";
+  const withStubNpx = (fn) =>
+    withDir((dir) => {
+      save(dir, healthy);
+      writeFileSync(join(dir, "stub.mjs"), STUB);
+      mkdirSync(join(dir, "bin"));
+      writeFileSync(join(dir, "bin", "npx"), `#!/bin/sh\nexec "${process.execPath}" "${join(dir, "stub.mjs")}" "$@"\n`, { mode: 0o755 });
+      const live = (args, extra = {}) =>
+        spawnSync(process.execPath, [SCRIPT, ...args], { encoding: "utf8", env: { ...env, PATH: join(dir, "bin"), STUB_DIR: dir, ...extra } });
+      return fn(dir, live);
+    });
+  const posix = { skip: process.platform === "win32" && "the stand-in npx is a shell script" };
+
+  test("a live run checks all six, saves them with --out, and the key appears nowhere", posix, () => {
+    withStubNpx((dir, live) => {
+      const out = join(dir, "out");
+      const child = live(["--out", out], { ASKAIPODS_API_KEY: KEY });
+      assert.match(child.stdout, /live-smoke: PASS — 6 of 6 scenario\(s\) checked, 0 skipped, 0 failure\(s\), 0 warning\(s\)/);
+      assert.equal(child.status, 0);
+      assert.deepEqual(readdirSync(out).sort(), SCENARIOS.map((s) => `${s.name}.json`).sort());
+      const saved = readdirSync(out).map((f) => readFileSync(join(out, f), "utf8"));
+      for (const text of [child.stdout, child.stderr, ...saved]) assert.ok(!text.includes(KEY));
+      const noKey = live([]);
+      assert.match(noKey.stdout, /live-smoke: PASS — 3 of 6 scenario\(s\) checked, 3 skipped/);
+    });
+  });
+
+  test("a CLI failure is reported with the key replaced, and exit 2 stops that tier's remaining searches", posix, () => {
+    withStubNpx((dir, live) => {
+      const child = live([], { ASKAIPODS_API_KEY: KEY, STUB_EXIT: "2" });
+      assert.match(child.stdout, /FAIL the CLI exited 2: error: the server rejected \[key\]/);
+      assert.equal((child.stdout.match(/not run: the daily quota for this tier is used up/g) ?? []).length, 2);
+      assert.match(child.stdout, /live-smoke: FAIL — 3 of 6 scenario\(s\) checked, 0 skipped, 3 failure\(s\)/);
+      assert.equal(child.status, 1);
+      assert.ok(!child.stdout.includes(KEY) && !child.stderr.includes(KEY));
+    });
   });
 });
 
