@@ -133,10 +133,9 @@ const YOUTUBE_WATCH_URL = /^https:\/\/www\.youtube\.com\/watch\?v=[A-Za-z0-9_-]{
 //                                 freshness banner in non-empty render)
 //   data.meta.corpus_freshness  — {newest_date: string|null} iff present
 //                                 (the "data as of X" signal)
-//   data.meta.cta               — object iff present (passthrough only,
-//                                 no render logic depends on its shape,
-//                                 but reject non-object so downstream
-//                                 type assumptions hold)
+//   data.meta.cta               — object iff present (tierNote reads
+//                                 cta.waitlist for the free-tier note
+//                                 and type-checks that field itself)
 //   data.meta.downgraded        — {from, reason, waitlist} strings iff
 //                                 present; drives the degrade notice
 function isValidSuccessEnvelope(data) {
@@ -239,9 +238,9 @@ function isValidSuccessEnvelope(data) {
       }
     }
   }
-  // cta is passthrough-only (no render logic reads its fields today),
-  // but reject non-object so future render paths don't crash on a
-  // primitive where they expect an object.
+  // cta: format.mjs tierNote reads `cta.waitlist` for the free-tier
+  // closing note, type-checking it there and falling back to
+  // WAITLIST_URL, so only the null-or-object shape is checked here.
   if (m.cta != null && !isPlainObject(m.cta)) return false;
   // window shape-check: format.mjs renderMarkdown reads
   // `window.truncated`, `window.expanded`, `window.requested_days`,
