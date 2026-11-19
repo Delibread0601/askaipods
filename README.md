@@ -7,11 +7,11 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 5/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 12/20 daily*
 
 ## Results — newest first
 
-### 1. Automated with Brian Heater — He Sold 2 Companies to Google. Now He’s Building Home Robots
+### 1. Automated with Brian Heater — Why Hello Robot’s Stretch Doesn’t Look Like a Human
 *2026-11-18* · https://www.youtube.com/watch?v=gAuRGA_QmYs · around 42:20: https://www.youtube.com/watch?v=gAuRGA_QmYs&t=2540s
 
 > The host noted that predictions like AGI always seem '5 to 10
