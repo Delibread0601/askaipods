@@ -60,7 +60,7 @@ $ askaipods "when will AGI arrive"
 
 ## Why this exists
 
-Web search is bad at "what is the AI community thinking about X right now". You get blog posts, Reddit threads, and outdated news articles. What you actually want is the *real conversation* — what researchers, founders, and investors are saying on AI podcasts, in their own words.
+Web search is bad at "what is the AI community thinking about X right now". You get blog posts, Reddit threads, and outdated news articles. What you actually want is the *real conversation* — what researchers, founders, and investors are saying on AI podcasts.
 
 `askaipods` is a thin CLI + agent skill that asks the [PodLens](https://podlens.net) semantic search API and returns the most relevant quote excerpts, sorted newest-first. The skill teaches your agent (Claude Code, OpenAI Codex, Hermes, OpenClaw, and any other [agentskills.io](https://agentskills.io)-compatible runtime) when to call the CLI, how to parse the output, and how to write a useful **Insights** section that summarizes the patterns across the returned quotes.
 
@@ -149,7 +149,7 @@ The anonymous tier exists so you can try the skill end-to-end with zero setup. A
 - **No speaker attribution.** The corpus indexes quotes at the episode level but does not attempt to identify *which guest* said each quote. The upstream pipeline avoids speaker labeling because automatic diarization is unreliable, and a wrong attribution is worse than no attribution.
 - **Timestamps are approximate.** Each result carries the episode's YouTube watch URL (`url`, every tier) and, when PodLens could locate the passage confidently, `anchor_s` / `anchor_url` — the video opened about 10 seconds before the passage discussing the point ("around 12:34"), not at an exact quote position. Both are `null` when no confident timestamp exists (then `url` opens the episode from the start); `url` is `null` for an episode without a link.
 - **AI-centred corpus.** 80+ podcasts centred on AI research, engineering, and investing, also covering venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics. Topics outside these domains return sparse, loosely related results.
-- **Short quote excerpts.** Each result is typically 1-3 sentences. For long-form context, listen to the episode.
+- **Short quote excerpts.** Each result is one extracted key point, typically 1-3 sentences, and may paraphrase the speaker rather than quote them. For long-form context, listen to the episode.
 
 These are not bugs. The skill surfaces them honestly so neither you nor your agent fabricate things the API does not provide.
 

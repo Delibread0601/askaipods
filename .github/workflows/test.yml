@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # auto-tag.yml calls this workflow and tags only when every job passes.
+  workflow_call:
 
 permissions:
   contents: read

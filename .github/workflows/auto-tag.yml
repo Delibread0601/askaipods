@@ -12,18 +12,20 @@ permissions:
   contents: write
 
 jobs:
+  # No tag or release for a version whose tests fail: the whole test
+  # workflow (every Node version in its matrix and the runtime floor) runs
+  # on the commit that would be tagged.
+  tests:
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/test.yml
+
   auto-tag:
+    needs: tests
     # A manual run can be started on any branch; only main gets tagged.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-
-      # No tag or release for a version whose tests fail.
-      - uses: actions/setup-node@v7
-        with:
-          node-version: "22.x"
-      - run: npm test
 
       # The tag is decided by what exists on the remote, not by comparing
       # package.json with the previous commit: a push that carries several

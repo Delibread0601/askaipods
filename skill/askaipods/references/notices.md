@@ -20,7 +20,7 @@ When the requested window holds fewer than 20 matches, the server retries wider 
 - `window.truncated === true` and `served_days > requested_days` → `*Note: The search widened to the last <served_days> days before a transient error or the server's response-time limit cut it short — results may be incomplete and may include episodes older than <requested_days> days. Retry in a moment.*`
 - `window.truncated === true` otherwise → `*Note: Widening the search beyond the initial <requested_days>-day window was cut short by a transient error or the server's response-time limit — results may be incomplete. Retry in a moment.*`
 
-Freshness banners come first when both apply. When you filtered the results to a calendar period, say instead how many returned results fall inside the period.
+Freshness banners come first when both apply. When you filtered the results to a calendar period, say instead how many returned results fall inside the period. When `--days` came from a rolling window the user named ("past week", "last 3 days") and `served_days` is greater than `requested_days`, keep every result, add to the note how many are dated within the last `requested_days` days (on or after the date that many days before the `fetched_at` date), and in Insights never describe an older result as being from that window.
 
 ## Empty results — priority ladder
 
