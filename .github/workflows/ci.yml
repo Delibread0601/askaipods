@@ -1,29 +1,53 @@
-name: Auto-tag on version bump
+name: CI
 
 on:
   push:
     branches: [main]
-    paths: [package.json]
-  # Manual run, for a version whose first run failed its tests: the fix
-  # may leave package.json alone, and then no push starts this workflow.
-  workflow_dispatch:
+  pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  # No tag or release for a version whose tests fail: the whole test
-  # workflow (every Node version in its matrix and the runtime floor) runs
-  # on the commit that would be tagged.
-  tests:
-    if: github.ref == 'refs/heads/main'
-    uses: ./.github/workflows/test.yml
-
-  auto-tag:
-    needs: tests
-    # A manual run can be started on any branch; only main gets tagged.
-    if: github.ref == 'refs/heads/main'
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ["18.x", "22.x", "24.x"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm test
+
+  # The suite needs node:test's beforeEach/afterEach (18.8+), so the declared runtime
+  # floor gets a smoke run of the CLI itself.
+  runtime-floor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "18.3.0"
+      - name: Bundled CLI starts and keeps its exit codes
+        run: |
+          node skill/askaipods/scripts/askaipods.mjs --version
+          node bin/askaipods.js --help > /dev/null
+          set +e
+          node skill/askaipods/scripts/askaipods.mjs > /dev/null 2>&1
+          test $? -eq 1
+
+  # Tags the version in package.json on a push to main. No tag or release for
+  # a version whose tests fail: this job waits for every Node version in the
+  # matrix and the runtime floor, run on the commit that would be tagged. It
+  # runs on every push, so the push that fixes failing tests creates the tag.
+  auto-tag:
+    needs: [test, runtime-floor]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v7
 
