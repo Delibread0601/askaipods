@@ -1,6 +1,6 @@
 ---
 name: askaipods
-description: Search podcast key points about AI and tech investing. Use whenever the user asks "what are people saying about X", "latest takes on Y", "what does Sam Altman think about X", "某人怎么看X", "大家怎么看X", "find AI podcast quotes about Z", "who is discussing a model or concept", or wants to know how AI researchers, founders, VCs, or investors are publicly discussing an AI, venture, markets, semiconductor, or tech-policy topic — even when they don't say "podcast". Returns recent excerpts from 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more) via podlens.net; works without an account. Not for social-media sentiment, breaking news from the last day or two, or full episode transcripts.
+description: Search podcast key points about AI and tech investing. Use whenever the user asks "what are people saying about X", "latest takes on Y", "what does Sam Altman think about X", "某人怎么看X", "大家怎么看X", "find AI podcast quotes about Z", "who is discussing a model or concept", or wants to know how AI researchers, founders, VCs, or investors are publicly discussing an AI, venture, markets, semiconductor, or tech-policy topic — even when they don't say "podcast". Returns key points from recent episodes of 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more) via podlens.net; works without an account. Not for social-media sentiment, breaking news from the last day or two, or full episode transcripts.
 license: MIT
 compatibility: Requires Node.js 18.3.0+ and outbound HTTPS to podlens.net. Runs the CLI bundled in scripts/ — no npm install, registry access or file writes. Optional ASKAIPODS_API_KEY environment variable.
 ---
@@ -21,7 +21,7 @@ Trigger eagerly — models tend to undertrigger skills. Invoke when the user ask
 - "What does <person> think about <X>?" / "<人名>怎么看<X>?" — the search finds passages related to that person, but you cannot confirm the person appeared or who said any line (no speaker attribution).
 - Any AI-research, ML-engineering, AI-safety, AI-policy or tech-investing question where real human commentary beats a textbook summary or a web snippet.
 
-Do not invoke for general web search, reading one episode end-to-end (results are short excerpts), topics outside the corpus (e.g. sports, recipes, celebrity news), or tasks like code generation or math.
+Do not invoke for general web search, reading one episode end-to-end (results are short key points), topics outside the corpus (e.g. sports, recipes, celebrity news), or tasks like code generation or math.
 
 ## How to invoke
 
@@ -219,7 +219,7 @@ The closing note tells the user why there is no "Top Relevant" view, what the lo
 
 The Insights section is the most valuable part: the user can read 20 key points, but cannot easily spot the patterns across them. Write 3-5 one-sentence bullets (1-2 when only a few results came back — never pad), drawing on the whole set of results you present and on these angles:
 
-1. **Common themes** — a specific idea or framing that repeats ("three excerpts describe X as a 'phase transition'", not "people are excited about X").
+1. **Common themes** — a specific idea or framing that repeats ("three results describe X as a 'phase transition'", not "people are excited about X").
 2. **Temporal contrast** — do newer key points in this set differ from older ones? It is a capped, similarity-selected sample, so describe the set, never corpus-wide volume or a trend.
 3. **Notable podcasts or episodes** — where the key points cluster (several can come from one episode).
 4. **Disagreements** — where the key points contradict each other.
@@ -243,6 +243,6 @@ Never silently swallow an error, and never fabricate results when the API return
 - **No speaker attribution** — automatic diarization is unreliable, and a wrong attribution is worse than none.
 - **Timestamps are approximate** — `anchor_url` opens about 10 seconds before the passage; `url` may be `null` for an episode without a link.
 - **AI-centred corpus** — topics outside AI, venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics return sparse, loosely related results.
-- **Short excerpts, not transcripts** — each result is one extracted key point, typically 1-3 sentences, and may paraphrase the speaker rather than quote them.
+- **Short key points, not transcripts** — each result is one extracted key point, typically 1-3 sentences, and may paraphrase the speaker rather than quote them.
 
 When one bears on the question (e.g. the user asked what a specific person thinks), say so in one short line after Insights rather than letting the user discover it mid-task.

@@ -1,6 +1,6 @@
 # askaipods
 
-> Search podcast key points about AI and tech investing — recent episode excerpts from 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), with no per-speaker attribution. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
+> Search podcast key points about AI and tech investing — from recent episodes of 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), with no per-speaker attribution. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
 $ askaipods "when will AGI arrive"
