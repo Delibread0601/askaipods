@@ -7,56 +7,53 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 8/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 1/20 daily*
 
 ## Results — newest first
 
-### 1. Decoder with Nilay Patel — The OpenAI board member who fired Sam Altman says we still can't trust AI CEOs | Decoder
-*2026-11-14* · https://www.youtube.com/watch?v=dOwqsYtXp6k · around 20:05: https://www.youtube.com/watch?v=dOwqsYtXp6k&t=1205s
+### 1. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
+*2026-11-17* · https://www.youtube.com/watch?v=9Y4HDQnvCas · around 53:35: https://www.youtube.com/watch?v=9Y4HDQnvCas&t=3215s
 
-> On whether AGI will come from current technology, Toner said it is
-> 'very solidly plausible' and should be prepared for, though not
-> certain in two years; she compared it to planning for a possible
-> Chinese invasion of Taiwan, which most analysts think unlikely but
-> which national security planners still take seriously.
+> Marcus's AGI timeline is 'probably sometime next decade.' He said
+> anyone giving a specific year lacks credibility without confidence
+> intervals, and he does not see AGI this decade (Marcus).
 
-### 2. 42章经 — 复盘 2C 和 2B Agent 发展脉络｜对谈 Afk.surf 创始人嘉琛
-*2026-11-14* · https://www.youtube.com/watch?v=OIY1CvduM4o · around 41:21: https://www.youtube.com/watch?v=OIY1CvduM4o&t=2481s
+### 2. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
+*2026-11-17* · https://www.youtube.com/watch?v=9Y4HDQnvCas
 
-> Second core view: within two to three years AGI-level models will be
-> widely and cheaply available, since open-source models are improving
-> and catching up at an accelerating pace while today's best models
-> still come mainly from Anthropic and OpenAI.
+> Marcus said that even if the needed scientific discoveries arrive
+> in the rest of this decade, putting them into practice will take
+> years, so he does not see real AGI/ASI this decade. He added that
+> 13 years from now is a long time, given the huge spending and a
+> growing understanding of what is still unknown (Marcus).
 
-### 3. Decoder with Nilay Patel — The OpenAI board member who fired Sam Altman says we still can't trust AI CEOs | Decoder
-*2026-11-14* · https://www.youtube.com/watch?v=dOwqsYtXp6k · around 18:05: https://www.youtube.com/watch?v=dOwqsYtXp6k&t=1085s
+### 3. Scaling Laws — Live from Georgetown University: AI Policy in 2027 with Alexandra Reeve Givens
+*2026-11-17* · https://www.youtube.com/watch?v=cLbN1H2eX_M · around 42:35: https://www.youtube.com/watch?v=cLbN1H2eX_M&t=2555s
 
-> Toner said she does not want to say we have AGI, but that AGI is no
-> longer useful as a milestone: it is a 'fuzzy cloud' of definitions,
-> and 'we're inside that cloud', having met some definitions (for
-> example, ChatGPT being general-purpose) but not others (sentience, or
-> doing everything any human can).
+> Alex Bores said OpenAI estimated reaching automated AI research by
+> March 2028, Anthropic employees say 2027, and the AI Futures
+> Project and the new METR report suggest 2027 may be more accurate,
+> which is before the next election.
 
-### 4. 42章经 — 复盘 2C 和 2B Agent 发展脉络｜对谈 Afk.surf 创始人嘉琛
-*2026-11-14* · https://www.youtube.com/watch?v=OIY1CvduM4o · around 27:53: https://www.youtube.com/watch?v=OIY1CvduM4o&t=1673s
+### 4. All-In Podcast — Databricks CEO: AGI Is Already Here, Why Companies Are Behind, and the Superintelligence Debate
+*2026-11-17* · https://www.youtube.com/watch?v=1bR0gtecoHU · around 9:35: https://www.youtube.com/watch?v=1bR0gtecoHU&t=575s
 
-> The guest said many 2025–early-2026 harnesses and dev platforms were
-> patching AI weaknesses rather than adding to its strengths, and
-> claimed that by the second half of 2026 models such as Opus 5.5 and
-> GPT-6 'Extra' deserve the label AGI in most scenarios, making add-ons
-> less useful or obsolete.
+> Ghodsi believes we already have artificial general intelligence by
+> the definition AMPLab researchers shared in 2009–2010, and said
+> former lab colleagues agreed that the goalposts have since moved.
 
-### 5. Dwarkesh Podcast — I thought superintelligence was a decade away. Not anymore.
-*2026-11-13* · https://www.youtube.com/watch?v=1NHPDzpfR6Y · around 10:05: https://www.youtube.com/watch?v=1NHPDzpfR6Y&t=605s
+### 5. All-In Podcast — Databricks CEO: AGI Is Already Here, Why Companies Are Behind, and the Superintelligence Debate
+*2026-11-17* · https://www.youtube.com/watch?v=1bR0gtecoHU · around 59:50: https://www.youtube.com/watch?v=1bR0gtecoHU&t=3590s
 
-> The speaker's median isn't 2027 only because they are unsure how
-> accurate that simple modeling is, and they say we should be ready for
-> the milestone to arrive next year.
+> Ghodsi predicted that closing the enterprise 'context gap' and
+> getting value from AI everywhere will take 10–15 years, unlike the
+> labs' 6–24-month expectations, and that GDP will 'move very
+> slowly' over decades, citing the bank that won't record meetings.
 
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-11-15 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-11-19 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
 
 ## Why this exists
 
