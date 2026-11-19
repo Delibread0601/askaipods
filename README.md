@@ -7,18 +7,32 @@ $ askaipods "when will AGI arrive"
 
 # askaipods · "when will AGI arrive"
 
-*Tier: anonymous · Sort: recency · Results: 20 · Quota: 1/20 daily*
+*Tier: anonymous · Sort: recency · Results: 20 · Quota: 5/20 daily*
 
 ## Results — newest first
 
-### 1. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
+### 1. Automated with Brian Heater — He Sold 2 Companies to Google. Now He’s Building Home Robots
+*2026-11-18* · https://www.youtube.com/watch?v=gAuRGA_QmYs · around 42:20: https://www.youtube.com/watch?v=gAuRGA_QmYs&t=2540s
+
+> The host noted that predictions like AGI always seem '5 to 10
+> years' away, and Edsinger cited Rodney Brooks's point that such
+> timelines always fall within the presenter's own lifetime.
+
+### 2. Newcomer Podcast — Is OpenAI Becoming the WeWork of AI? | Gary Marcus
+*2026-11-18* · https://www.youtube.com/watch?v=Ub64R5Ts2wA · around 45:50: https://www.youtube.com/watch?v=Ub64R5Ts2wA&t=2750s
+
+> Marcus expects recursive self-improvement within about 3 years
+> only for engineering-type gains (such as shrinking models while
+> keeping accuracy), not for genuine scientific breakthroughs.
+
+### 3. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
 *2026-11-17* · https://www.youtube.com/watch?v=9Y4HDQnvCas · around 53:35: https://www.youtube.com/watch?v=9Y4HDQnvCas&t=3215s
 
 > Marcus's AGI timeline is 'probably sometime next decade.' He said
 > anyone giving a specific year lacks credibility without confidence
 > intervals, and he does not see AGI this decade (Marcus).
 
-### 2. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
+### 4. Big Technology Podcast — Why The Anthropic IPO Will Fail — With Gary Marcus
 *2026-11-17* · https://www.youtube.com/watch?v=9Y4HDQnvCas
 
 > Marcus said that even if the needed scientific discoveries arrive
@@ -27,28 +41,13 @@ $ askaipods "when will AGI arrive"
 > 13 years from now is a long time, given the huge spending and a
 > growing understanding of what is still unknown (Marcus).
 
-### 3. Scaling Laws — Live from Georgetown University: AI Policy in 2027 with Alexandra Reeve Givens
+### 5. Scaling Laws — Live from Georgetown University: AI Policy in 2027 with Alexandra Reeve Givens
 *2026-11-17* · https://www.youtube.com/watch?v=cLbN1H2eX_M · around 42:35: https://www.youtube.com/watch?v=cLbN1H2eX_M&t=2555s
 
 > Alex Bores said OpenAI estimated reaching automated AI research by
 > March 2028, Anthropic employees say 2027, and the AI Futures
 > Project and the new METR report suggest 2027 may be more accurate,
 > which is before the next election.
-
-### 4. All-In Podcast — Databricks CEO: AGI Is Already Here, Why Companies Are Behind, and the Superintelligence Debate
-*2026-11-17* · https://www.youtube.com/watch?v=1bR0gtecoHU · around 9:35: https://www.youtube.com/watch?v=1bR0gtecoHU&t=575s
-
-> Ghodsi believes we already have artificial general intelligence by
-> the definition AMPLab researchers shared in 2009–2010, and said
-> former lab colleagues agreed that the goalposts have since moved.
-
-### 5. All-In Podcast — Databricks CEO: AGI Is Already Here, Why Companies Are Behind, and the Superintelligence Debate
-*2026-11-17* · https://www.youtube.com/watch?v=1bR0gtecoHU · around 59:50: https://www.youtube.com/watch?v=1bR0gtecoHU&t=3590s
-
-> Ghodsi predicted that closing the enterprise 'context gap' and
-> getting value from AI everywhere will take 10–15 years, unlike the
-> labs' 6–24-month expectations, and that GDP will 'move very
-> slowly' over decades, citing the bank that won't record meetings.
 
 (...15 more results, newest-first...)
 ```
