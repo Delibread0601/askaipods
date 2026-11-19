@@ -219,7 +219,7 @@ export function toStructured(query, response, now = new Date()) {
       // the server has none. client.mjs already nulled anything outside the
       // watch-URL shape.
       url: r.url ?? null,
-      // Approximate start of the passage the quote comes from (seconds)
+      // Approximate start of the passage the key point comes from (seconds)
       // and the url opened there; null when the server has no confident
       // timestamp. client.mjs keeps them only as a consistent pair.
       anchor_s: r.anchor_s ?? null,

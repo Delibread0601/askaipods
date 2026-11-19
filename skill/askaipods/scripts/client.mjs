@@ -147,7 +147,7 @@ function isValidSuccessEnvelope(data) {
     // text must be a string with something visible in it. Whitespace,
     // control characters, format characters and joiners alone would
     // render as an empty blockquote row (`> ` with nothing after it) in
-    // --format markdown, and as an empty quote for an agent.
+    // --format markdown, and as an empty result for an agent.
     if (typeof item.text !== "string" || !hasVisibleText(item.text)) return false;
     // `!= null` intentionally matches both null and undefined (contract
     // allows either as "missing"), but rejects numbers, objects, arrays.
@@ -164,7 +164,7 @@ function isValidSuccessEnvelope(data) {
       if (!YOUTUBE_WATCH_URL.test(item.url)) item.url = null;
     }
     // anchor_s / anchor_url: the approximate start of the passage the
-    // quote comes from.  Same split: a wrong JSON type is a contract
+    // key point comes from.  Same split: a wrong JSON type is a contract
     // break; a value that is not the exact url&t=<s>s pair is nulled, so
     // a host agent never renders an arbitrary or mismatched time link.
     if (item.anchor_s != null && typeof item.anchor_s !== "number") return false;

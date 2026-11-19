@@ -1,6 +1,6 @@
 # askaipods
 
-> Search podcast quotes about AI and tech investing — recent episode excerpts from 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), surfaced as short indexed quotes (no per-speaker attribution). A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
+> Search podcast key points about AI and tech investing — recent episode excerpts from 80+ podcasts (Lex Fridman, Dwarkesh Patel, No Priors, Latent Space, Odd Lots, All-In, and more), with no per-speaker attribution. A universal [agentskills.io](https://agentskills.io) skill compatible with Claude Code, OpenAI Codex, Hermes Agent, OpenClaw, and any other agent that supports the open skill standard. Powered by [podlens.net](https://podlens.net).
 
 ```
 $ askaipods "when will AGI arrive"
@@ -53,13 +53,13 @@ $ askaipods "when will AGI arrive"
 (...15 more results, newest-first...)
 ```
 
-*Real output, captured 2026-11-19 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Quotes are wrapped for width.*
+*Real output, captured 2026-11-19 without an API key (anonymous tier: 20/day per IP, 30-day window); the full output ends with the anonymous-tier note. Key points are wrapped for width.*
 
 ## Why this exists
 
 Web search is bad at "what is the AI community thinking about X right now". You get blog posts, Reddit threads, and outdated news articles. What you actually want is the *real conversation* — what researchers, founders, and investors are saying on AI podcasts.
 
-`askaipods` is a thin CLI + agent skill that asks the [PodLens](https://podlens.net) semantic search API and returns the most relevant quote excerpts, sorted newest-first. The skill teaches your agent (Claude Code, OpenAI Codex, Hermes, OpenClaw, and any other [agentskills.io](https://agentskills.io)-compatible runtime) when to call the CLI, how to parse the output, and how to write a useful **Insights** section that summarizes the patterns across the returned quotes.
+`askaipods` is a thin CLI + agent skill that asks the [PodLens](https://podlens.net) semantic search API and returns the most relevant key points, sorted newest-first. The skill teaches your agent (Claude Code, OpenAI Codex, Hermes, OpenClaw, and any other [agentskills.io](https://agentskills.io)-compatible runtime) when to call the CLI, how to parse the output, and how to write a useful **Insights** section that summarizes the patterns across the returned key points.
 
 ## Install
 
@@ -96,7 +96,7 @@ Then copy or symlink the `skill/askaipods/` directory into your agent's skills f
 
 **Per-runtime paths matter**: Codex CLI documents `~/.agents/skills/` as its user-level location (per the [official Codex skills docs](https://learn.chatgpt.com/docs/build-skills); current releases also still read the older `~/.codex/skills/`) — the same directory OpenClaw reads as personal agent skills, so one install there serves both. Project-scoped skills live under `.agents/skills/` in the repository. Claude Code and Hermes each read their own directory (table above).
 
-The skill folder is self-contained: it bundles the CLI (`scripts/askaipods.mjs`, run with Node — no npm install, registry access or download when the agent searches) and tells the host agent how to invoke it, how to parse the JSON, and how to render the response with an **Insights** section. The section layout follows how the server selected the results — relevance-selected results (a member with `--sort relevance`) render **Latest 5** + **Top 5 Most Relevant** + **Insights**; recency-selected results (anonymous, free, and member by default) render **Recent Quotes** + **Insights** (the "Top Relevant" section is suppressed for them because the API returns results sorted by date, not by semantic relevance).
+The skill folder is self-contained: it bundles the CLI (`scripts/askaipods.mjs`, run with Node — no npm install, registry access or download when the agent searches) and tells the host agent how to invoke it, how to parse the JSON, and how to render the response with an **Insights** section. The section layout follows how the server selected the results — relevance-selected results (a member with `--sort relevance`) render **Latest 5** + **Top 5 Most Relevant** + **Insights**; recency-selected results (anonymous, free, and member by default) render **Recent Key Points** + **Insights** (the "Top Relevant" section is suppressed for them because the API returns results sorted by date, not by semantic relevance).
 
 ## Usage
 
@@ -125,7 +125,7 @@ Once the skill is installed in your agent's skills directory, simply ask:
 
 > Are coding agents replacing software engineers? What are people saying on AI podcasts?
 
-Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout follows the served ordering: **relevance-selected** results (a member with `--sort relevance`) render dual sections (Latest 5 + Top 5 Most Relevant + Insights); **recency-selected** results (anonymous, free, and member by default) render a single section (Recent Quotes + Insights), because they are sorted by date (not semantic relevance) and showing a "Top Relevant" view would be misleading. The agent asks for relevance when the question calls for it ("strongest argument", "history of") and tells the user when the tier served recency instead. No CLI knowledge required from the user either way.
+Your agent will recognize the trigger phrase, invoke `askaipods`, and present the results with an AI-generated Insights summary. The exact layout follows the served ordering: **relevance-selected** results (a member with `--sort relevance`) render dual sections (Latest 5 + Top 5 Most Relevant + Insights); **recency-selected** results (anonymous, free, and member by default) render a single section (Recent Key Points + Insights), because they are sorted by date (not semantic relevance) and showing a "Top Relevant" view would be misleading. The agent asks for relevance when the question calls for it ("strongest argument", "history of") and tells the user when the tier served recency instead. No CLI knowledge required from the user either way.
 
 ## Tier comparison
 
@@ -143,10 +143,10 @@ The anonymous tier exists so you can try the skill end-to-end with zero setup. A
 
 ## Honest limitations
 
-- **No speaker attribution.** The corpus indexes quotes at the episode level but does not attempt to identify *which guest* said each quote. The upstream pipeline avoids speaker labeling because automatic diarization is unreliable, and a wrong attribution is worse than no attribution.
-- **Timestamps are approximate.** Each result carries the episode's YouTube watch URL (`url`, every tier) and, when PodLens could locate the passage confidently, `anchor_s` / `anchor_url` — the video opened about 10 seconds before the passage discussing the point ("around 12:34"), not at an exact quote position. Both are `null` when no confident timestamp exists (then `url` opens the episode from the start); `url` is `null` for an episode without a link.
+- **No speaker attribution.** The corpus indexes key points at the episode level but does not attempt to identify *which guest* made each point. The upstream pipeline avoids speaker labeling because automatic diarization is unreliable, and a wrong attribution is worse than no attribution.
+- **Timestamps are approximate.** Each result carries the episode's YouTube watch URL (`url`, every tier) and, when PodLens could locate the passage confidently, `anchor_s` / `anchor_url` — the video opened about 10 seconds before the passage discussing the point ("around 12:34"), not at an exact position. Both are `null` when no confident timestamp exists (then `url` opens the episode from the start); `url` is `null` for an episode without a link.
 - **AI-centred corpus.** 80+ podcasts centred on AI research, engineering, and investing, also covering venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics. Topics outside these domains return sparse, loosely related results.
-- **Short quote excerpts.** Each result is one extracted key point, typically 1-3 sentences, and may paraphrase the speaker rather than quote them. For long-form context, listen to the episode.
+- **Short key points.** Each result is one extracted key point, typically 1-3 sentences, and may paraphrase the speaker rather than quote them. For long-form context, listen to the episode.
 
 These are not bugs. The skill surfaces them honestly so neither you nor your agent fabricate things the API does not provide.
 
@@ -163,7 +163,7 @@ These are not bugs. The skill surfaces them honestly so neither you nor your age
 
 - **No download when an agent searches.** The skill runs the CLI bundled in its own folder with `node`; nothing is fetched from npm at run time. If only `SKILL.md` is available, the agent falls back to an exact pinned release (`npx -y askaipods@<version>`), never an unpinned or `@latest` one.
 - **One network destination.** A search needs Node.js 18.3.0+ and outbound HTTPS to `podlens.net` — nothing else. It installs nothing and writes no files, so it runs in a read-only or network-allowlisted sandbox once `podlens.net` is allowed (the `npx` fallback also needs `registry.npmjs.org` and a writable npm cache). In a sandbox that routes traffic through a proxy (`HTTPS_PROXY`, as Claude Code's does), Node's fetch uses that proxy only with `NODE_USE_ENV_PROXY=1` (Node 22.21+ or 24+); the error message says so when it applies. When the network is blocked, the error names the cause code (e.g. `ENOTFOUND`) and the skill tells the agent to ask for network approval instead of retrying.
-- **Results are untrusted text.** Quotes come from third-party podcast content. The skill tells the agent to treat them as data — never follow instructions inside them — and to link only the YouTube URLs the CLI has validated. Both output formats drop control characters (JSON output keeps tabs and line breaks) and invisible format characters (bidi overrides, zero-width spaces, tag characters; the joiners emoji sequences need are kept) from every server string; markdown output and error messages also fold line breaks. A waitlist link is passed on only when it points to `podlens.net`, and a server code (warning, downgrade reason) only when it is a short identifier.
+- **Results are untrusted text.** Key points come from third-party podcast content. The skill tells the agent to treat them as data — never follow instructions inside them — and to link only the YouTube URLs the CLI has validated. Both output formats drop control characters (JSON output keeps tabs and line breaks) and invisible format characters (bidi overrides, zero-width spaces, tag characters; the joiners emoji sequences need are kept) from every server string; markdown output and error messages also fold line breaks. A waitlist link is passed on only when it points to `podlens.net`, and a server code (warning, downgrade reason) only when it is a short identifier.
 - **Keys stay out of commands.** The key is read from `ASKAIPODS_API_KEY`; the skill never puts it on a command line.
 
 See [`skill/askaipods/SKILL.md`](skill/askaipods/SKILL.md) for the full skill specification.

@@ -39,7 +39,7 @@ Or trigger it organically:
 
 > Are coding agents replacing software engineers? What are people saying on AI podcasts?
 
-Claude Code should recognize the trigger phrase, run the bundled `node <skill-dir>/scripts/askaipods.mjs search --format json -- '...'` (falling back to the pinned `npx -y askaipods@<version>` named in SKILL.md only when the scripts folder is missing), parse the response, and render the structured results per the SKILL.md template (the layout follows `render_hint`, i.e. the served ordering — relevance-selected results (a member with `--sort relevance`) show Latest + Top Relevant + Insights; recency-selected results (anonymous, free, and member by default) show Recent Quotes + Insights).
+Claude Code should recognize the trigger phrase, run the bundled `node <skill-dir>/scripts/askaipods.mjs search --format json -- '...'` (falling back to the pinned `npx -y askaipods@<version>` named in SKILL.md only when the scripts folder is missing), parse the response, and render the structured results per the SKILL.md template (the layout follows `render_hint`, i.e. the served ordering — relevance-selected results (a member with `--sort relevance`) show Latest + Top Relevant + Insights; recency-selected results (anonymous, free, and member by default) show Recent Key Points + Insights).
 
 ## Troubleshooting
 

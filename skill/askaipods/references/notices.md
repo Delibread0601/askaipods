@@ -2,7 +2,7 @@
 
 Read this file when a response has empty `results`, a non-null `meta.warning`, `meta.window.expanded === true`, `meta.window.truncated === true`, or `meta.quota.refunded === true`. The common path (results present, none of those set) needs only SKILL.md.
 
-Banners go with the banners in SKILL.md, as italic lines before the first section heading. An empty-result message takes the place of the result sections; the refund note goes at the end. Never invent quotes to fill an empty result, and never silently swallow a notice.
+Banners go with the banners in SKILL.md, as italic lines before the first section heading. An empty-result message takes the place of the result sections; the refund note goes at the end. Never invent results to fill an empty result, and never silently swallow a notice.
 
 ## Freshness banner (results present, `meta.warning` non-null)
 
@@ -30,8 +30,8 @@ Freshness banners come first when both apply. When you filtered the results to a
 2. `meta.warning?.code === "index_metadata_stale"` → "Recently indexed episodes are still propagating to the search index — retry in a few minutes."
 3. `meta.warning?.code` is any other value → "No results. The server flagged a freshness issue with this search (code: `<meta.warning.code>`) — results may be incomplete or the requested window may be stale. Try a longer `--days` (up to your tier cap) or retry in a few minutes."
 4. `meta.window?.truncated === true` → the widening was cut short by a transient error or the server's response-time limit; tell the user to retry in a moment (not to rephrase).
-5. `meta.window?.expanded === true` → "No quotes found. The API expanded the search from N to M days but found no matches. Try rephrasing or broadening the query." Append "(corpus indexed through `<newest_date>`)" when `meta.corpus_freshness?.newest_date` is present.
-6. Otherwise → "No quotes found for that topic. The corpus covers AI/ML, venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics — for a topic outside these, a web search may serve better; otherwise try rephrasing or broadening the query."
+5. `meta.window?.expanded === true` → "No results found. The API expanded the search from N to M days but found no matches. Try rephrasing or broadening the query." Append "(corpus indexed through `<newest_date>`)" when `meta.corpus_freshness?.newest_date` is present.
+6. Otherwise → "No results found for that topic. The corpus covers AI/ML, venture capital, global markets & finance, semiconductors & compute, and tech policy & geopolitics — for a topic outside these, a web search may serve better; otherwise try rephrasing or broadening the query."
 
 The closing tier note from SKILL.md still applies after an empty result.
 

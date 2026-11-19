@@ -16,7 +16,7 @@ import { renderJson, renderMarkdown } from "./format.mjs";
 
 const VERSION = "0.3.9";
 
-const HELP_TEXT = `askaipods ${VERSION} — search podcast quotes about AI and tech investing
+const HELP_TEXT = `askaipods ${VERSION} — search podcast key points about AI and tech investing
 
 USAGE:
   askaipods <query> [options]
